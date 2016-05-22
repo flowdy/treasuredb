@@ -40,16 +40,16 @@ need the `sqlite3` binary or any sqlite3 GUI software to run it.
 
 1. Run the test suite: `bash schema.t.sh` (on Linux and unix systems)
 
-    # Or go by foot and test manually a little bit further
-    treasuredb $ sqlite3
-    SQLite version 3.8.7.1 2014-10-29 13:59:56
-    Enter ".help" for usage hints.
-    Connected to a transient in-memory database.
-    Use ".open FILENAME" to reopen on a persistent database.
-    sqlite> .read schema.sql
-    
-    sqlite> .read schema.t.sql
-    ...
+        # Or go by foot and test manually a little bit further
+        treasuredb $ sqlite3
+        SQLite version 3.8.7.1 2014-10-29 13:59:56
+        Enter ".help" for usage hints.
+        Connected to a transient in-memory database.
+        Use ".open FILENAME" to reopen on a persistent database.
+        sqlite> .read schema.sql
+        
+        sqlite> .read schema.t.sql
+        ...
 
 1. Setup the database: `sqlite3 treasure.db < schema.sql`
 
