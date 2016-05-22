@@ -5,8 +5,8 @@ CREATE TABLE Account (
   IBAN -- Zielkonto für etwaige Rückzahlungen.
 );
 CREATE TABLE Debit (
-  receiptId PRIMARY KEY NOT NULL,
-  debitor NOT NULL, -- Account charged
+  billId PRIMARY KEY NOT NULL,
+  debtor NOT NULL, -- Account charged
   targetCredit INTEGER, -- record id in Credit table to pay into.
                    -- just understand it as virtual payment
                    -- NULL when debit is a bank transfer from the club account
@@ -14,7 +14,7 @@ CREATE TABLE Debit (
   purpose NOT NULL, -- description of receipt
   value INTEGER NOT NULL, -- Euro-Cent
   paid INTEGER DEFAULT 0, -- Euro-Cent, set and changed automatically (Cache)
-  FOREIGN KEY (debitor) REFERENCES Account(ID),
+  FOREIGN KEY (debtor) REFERENCES Account(ID),
   FOREIGN KEY (targetCredit) REFERENCES Credit(Id)
 );
 CREATE TABLE Credit (
@@ -38,12 +38,12 @@ CREATE TABLE Credit (
 -- for payment of newly inserted debts.
 CREATE TABLE Transfer (
   timestamp DATE DEFAULT CURRENT_TIMESTAMP,
-  receiptId INTEGER NOT NULL,
+  billId INTEGER NOT NULL,
   fromCredit INTEGER NOT NULL, 
   amount INTEGER, -- für spätere Nachvollziehbarkeit. Nötig auch bei Widerruf
-  FOREIGN KEY (receiptId) REFERENCES Debit(receiptId),
+  FOREIGN KEY (billId) REFERENCES Debit(billId),
   FOREIGN KEY (fromCredit) REFERENCES Credit(Id),
-  UNIQUE (receiptId, fromCredit)
+  UNIQUE (billId, fromCredit)
 );
 
 CREATE TABLE IF NOT EXISTS _temp (d, c, m);
@@ -51,15 +51,15 @@ CREATE TRIGGER balanceTransfer
      AFTER INSERT ON Transfer 
 BEGIN
 
-  SELECT RAISE(FAIL, "It is not the debitor who pays")
-    WHERE (SELECT debitor FROM Debit WHERE receiptId=NEW.receiptId)
+  SELECT RAISE(FAIL, "It is not the debtor who pays")
+    WHERE (SELECT debtor FROM Debit WHERE billId=NEW.billId)
        != (SELECT account FROM Credit WHERE Id=NEW.fromCredit)
     ;
 
   INSERT INTO _temp
      SELECT remainingDebt, remainingCredit, min(remainingDebt,remainingCredit) 
      FROM (SELECT
-         (SELECT value - paid FROM Debit WHERE receiptId=NEW.receiptId) AS remainingDebt, 
+         (SELECT value - paid FROM Debit WHERE billId=NEW.billId) AS remainingDebt, 
          (SELECT value - spent FROM Credit WHERE Id=NEW.fromCredit) AS remainingCredit
      ) AS microbalance
   ;
@@ -71,14 +71,14 @@ BEGIN
         ELSE
           (SELECT m FROM _temp)
       END
-      WHERE receiptId=NEW.receiptId;
+      WHERE billId=NEW.billId;
 
   UPDATE Credit
       SET value = value + (SELECT m FROM _temp)
       WHERE Id = (
           SELECT targetCredit
           FROM Debit
-          WHERE receiptId=NEW.receiptId
+          WHERE billId=NEW.billId
       );
 
   UPDATE Credit
@@ -92,7 +92,7 @@ BEGIN
 
   UPDATE Transfer
       SET amount = (SELECT m FROM _temp)
-      WHERE receiptId=NEW.receiptId AND fromCredit=NEW.fromCredit
+      WHERE billId=NEW.billId AND fromCredit=NEW.fromCredit
         ;
 
   DELETE FROM _temp;
@@ -107,7 +107,7 @@ BEGIN
 
   UPDATE Debit
       SET paid = paid - OLD.amount
-      WHERE receiptId=OLD.receiptId
+      WHERE billId=OLD.billId
       ;
 
   UPDATE Credit
@@ -115,7 +115,7 @@ BEGIN
       WHERE Id = (
           SELECT targetCredit
           FROM Debit
-          WHERE receiptId=OLD.receiptId
+          WHERE billId=OLD.billId
       );
 
   UPDATE Credit
@@ -144,7 +144,7 @@ END;
 -- when new transfer records are inserted
 CREATE TRIGGER enforceDebtImmutableOutsideTrigger
     BEFORE UPDATE OF paid ON Debit
-    WHEN NOT EXISTS (SELECT * FROM Transfer t WHERE NEW.receiptId=t.receiptId AND amount IS NULL)
+    WHEN NOT EXISTS (SELECT * FROM Transfer t WHERE NEW.billId=t.billId AND amount IS NULL)
 BEGIN
     SELECT RAISE(FAIL, "paid is set and adjusted automatically according to added Transfer records")
     WHERE (NEW.paid + IFNULL((SELECT m FROM _temp WHERE c IS NULL AND d IS NULL),0) ) <> OLD.paid;
@@ -152,7 +152,7 @@ END;
 
 CREATE TRIGGER enforceFixedDebits
     BEFORE UPDATE OF value ON Debit
-    WHEN EXISTS (SELECT * FROM Transfer WHERE receiptId=NEW.receiptId)
+    WHEN EXISTS (SELECT * FROM Transfer WHERE billId=NEW.billId)
 BEGIN
     SELECT RAISE(FAIL, "Debt is involved in transfers to revoke at first");
 END;
@@ -186,12 +186,15 @@ CREATE TRIGGER checkIBANatTransfer
     WHEN NEW.targetCredit IS NULL
 BEGIN
    SELECT RAISE(FAIL, "IBAN used does not match IBAN currently stored in account record")
-   FROM (SELECT instr(NEW.purpose, IBAN) AS fnd FROM Account WHERE ID=NEW.debitor) AS matchingIBAN
+   FROM (SELECT instr(NEW.purpose, IBAN) AS fnd FROM Account WHERE ID=NEW.debtor) AS matchingIBAN
    WHERE fnd IS NULL OR fnd = 0;
 END;
 
 CREATE VIEW CurrentDebts AS
-    SELECT debitor, purpose, date,
+    SELECT debtor,
+           targetCredit,
+           purpose,
+           date,
            value - paid AS difference
     FROM Debit
     WHERE value != paid
@@ -205,9 +208,27 @@ CREATE VIEW AvailableCredits AS
 ;
       
 CREATE VIEW Balance AS
-  SELECT ID, IFNULL(ac.allCredits,0) credit, IFNULL(cd.allDebts, 0) debit
+  SELECT Account.ID             AS ID,
+      IFNULL(ac.allCredits,0)   AS credit,
+      IFNULL(pr.allPromises, 0) AS promised,
+      IFNULL(cd.allDebts, 0)    AS debt
   FROM Account
-     LEFT OUTER JOIN (SELECT debitor, sum(difference) AS allDebts FROM CurrentDebts GROUP BY debitor) AS cd ON ID=cd.debitor
-     LEFT OUTER JOIN (SELECT account, sum(difference) AS allCredits FROM AvailableCredits GROUP BY account) AS ac ON ID=ac.account
+     LEFT OUTER JOIN (
+         SELECT debtor, sum(difference) AS allDebts
+         FROM CurrentDebts
+         GROUP BY debtor
+     )                          AS cd ON Account.ID=cd.debtor
+     LEFT OUTER JOIN (
+         SELECT account, sum(difference) AS allCredits
+         FROM AvailableCredits
+         GROUP BY account
+     )                          AS ac ON Account.ID=ac.account
+     LEFT OUTER JOIN (
+         SELECT a.ID AS ID, sum(difference) AS allPromises
+         FROM CurrentDebts cd
+             JOIN Credit c ON cd.targetCredit = c.Id
+             JOIN Account a ON a.ID = c.account
+         GROUP BY a.ID
+     )                          AS pr ON Account.ID=pr.ID
   ;
 
