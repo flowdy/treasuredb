@@ -69,7 +69,7 @@ BEGIN
   UPDATE Debit
       SET paid = paid + CASE
         WHEN (SELECT d FROM _temp) <= 0
-          THEN RAISE(FAIL, "Debt is already paid")
+          THEN RAISE(FAIL, "Debt settled")
         ELSE
           (SELECT m FROM _temp)
       END
@@ -86,7 +86,7 @@ BEGIN
   UPDATE Credit
       SET spent = spent + CASE
         WHEN (SELECT c FROM _temp) <= 0
-          THEN RAISE(FAIL, "Credit is already spent")
+          THEN RAISE(FAIL, "Credit spent")
         ELSE
           (SELECT m FROM _temp)
       END
@@ -132,17 +132,17 @@ CREATE TRIGGER enforceImmutableTransfer
     BEFORE UPDATE ON Transfer
     WHEN OLD.amount IS NOT NULL
 BEGIN
-    SELECT RAISE(FAIL, "Transfer cannot be updated, but needs to be revoked and re-inserted to ensure the triggers run");
+    SELECT RAISE(FAIL, "Transfer cannot be updated, but needs to be revoked and re-inserted to run triggers");
 END;
 
 CREATE TRIGGER enforceiZeroPaidAtStart
     BEFORE INSERT ON Debit
 BEGIN
-    SELECT RAISE(FAIL, "debt must be initially unpaid")
+    SELECT RAISE(FAIL, "Debt must be initially unpaid")
     WHERE NEW.paid <> 0;
 END;
 
--- Prevent modification with paid value outside triggers which must adjust it exclusively
+-- Prevent modification of paid value outside triggers which must adjust it exclusively
 -- when new transfer records are inserted
 CREATE TRIGGER enforceDebtImmutableOutsideTrigger
     BEFORE UPDATE OF paid ON Debit
