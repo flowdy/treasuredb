@@ -1,8 +1,9 @@
 CREATE TABLE Account (
   ID PRIMARY KEY NOT NULL,
   type NOT NULL,
-  altId NOT NULL, -- z.B. bei Typ "Mitglied" Nr. laut externer Mitgliedertabelle 
-  IBAN -- Zielkonto für etwaige Rückzahlungen.
+  altId NOT NULL, -- e.g. when type "member", no. in external member table 
+  IBAN -- target account for returned payments (set '' to enable
+       -- outgoing bank transfers to commercial partners from that account).
 );
 CREATE TABLE Debit (
   billId PRIMARY KEY NOT NULL,
@@ -29,18 +30,19 @@ CREATE TABLE Credit (
   FOREIGN KEY (account) REFERENCES Account(ID)
 );
 
--- Which credit pays/paid down which debt is recorded traceably so as to clarify any case of reminder
--- without ambuiguity about which debt is due yet. The user specifies, in accordance with any indicated
--- purpose of a received bank transfer, which credit is intended for which debt. Following triggers
--- verify this relation and mark a debit as paid and/or a credit as paid.
--- Debits to which applies value > paid, are meant to be suggested for assignment to newly inserted
--- credit records without indicated purpose. Likewise, credits to which applies value > spent are candidates
--- for payment of newly inserted debts.
+-- Which credit pays/paid down which debt is recorded traceably so as to clarify any case of reminder,
+-- without ambuiguity about, which debt is actually due yet, or to clarify which transfer is used for
+-- which debts. The user specifies which credit is intended for which debt, in accordance with the
+-- purpose if any is indicated in a received bank transfer. Following triggers verify this relation
+-- and mark a debit as paid and/or a credit as paid.
+-- Debits to which applies value > paid are meant to be suggested for assignment to newly inserted
+-- credit records without indicated purpose. Likewise, credits without indicated purpose to which
+-- applies value > spent are candidates for payment of newly inserted debts.
 CREATE TABLE Transfer (
   timestamp DATE DEFAULT CURRENT_TIMESTAMP,
   billId INTEGER NOT NULL,
   fromCredit INTEGER NOT NULL, 
-  amount INTEGER, -- für spätere Nachvollziehbarkeit. Nötig auch bei Widerruf
+  amount INTEGER, -- for later traceability, necessary when revoking transfers
   FOREIGN KEY (billId) REFERENCES Debit(billId),
   FOREIGN KEY (fromCredit) REFERENCES Credit(Id),
   UNIQUE (billId, fromCredit)
@@ -51,7 +53,7 @@ CREATE TRIGGER balanceTransfer
      AFTER INSERT ON Transfer 
 BEGIN
 
-  SELECT RAISE(FAIL, "It is not the debtor who pays")
+  SELECT RAISE(FAIL, "It is not the debtor who is set to pay")
     WHERE (SELECT debtor FROM Debit WHERE billId=NEW.billId)
        != (SELECT account FROM Credit WHERE Id=NEW.fromCredit)
     ;
@@ -61,13 +63,13 @@ BEGIN
      FROM (SELECT
          (SELECT value - paid FROM Debit WHERE billId=NEW.billId) AS remainingDebt, 
          (SELECT value - spent FROM Credit WHERE Id=NEW.fromCredit) AS remainingCredit
-     ) AS microbalance
+     )
   ;
 
   UPDATE Debit
       SET paid = paid + CASE
         WHEN (SELECT d FROM _temp) <= 0
-          THEN RAISE(ROLLBACK, "Debt is already paid")
+          THEN RAISE(FAIL, "Debt is already paid")
         ELSE
           (SELECT m FROM _temp)
       END
@@ -164,7 +166,7 @@ BEGIN
     WHERE NEW.spent != 0;
 END;
 
--- Prevent modification with spent value outside triggers which must adjust it exclusively
+-- Prevent modification of spent value outside triggers which must adjust it exclusively
 -- when new transfer records are inserted
 CREATE TRIGGER enforceSpentImmutableOutsideTrigger
     BEFORE UPDATE OF spent ON Credit
@@ -186,7 +188,11 @@ CREATE TRIGGER checkIBANatTransfer
     WHEN NEW.targetCredit IS NULL
 BEGIN
    SELECT RAISE(FAIL, "IBAN used does not match IBAN currently stored in account record")
-   FROM (SELECT instr(NEW.purpose, IBAN) AS fnd FROM Account WHERE ID=NEW.debtor) AS matchingIBAN
+   FROM (
+      SELECT instr(NEW.purpose, IBAN) AS fnd
+      FROM Account
+      WHERE ID=NEW.debtor
+   ) AS matchingIBAN
    WHERE fnd IS NULL OR fnd = 0;
 END;
 
