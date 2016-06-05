@@ -49,7 +49,7 @@ need the `sqlite3` binary or any sqlite3 GUI software to run it.
 
 1. Ensure sqlite3 is installed
 
-1. Run the test suite: `bash schema.t.sh` (on Linux and unix systems)
+1. Run the test suite: `./test.sh` (on Linux and unix systems with Bash installed)
 
         # Or go by foot and test manually a little bit further
         treasuredb $ sqlite3
