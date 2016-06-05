@@ -16,7 +16,7 @@ bank transfers.
 
 The Credit table stores bank transfers from the member to the club, and also the target
 records of internal transfers to the club and other members performing commercial services for
-the club. The value of the former sort is initially >0 and normally not altered afterwards.
+it. The value of the former sort is initially >0 and should not be altered afterwards.
 The latter's value always starts at 0 and is increased automatically by transfers linked to the
 according debts.
 
@@ -29,6 +29,17 @@ Transfers cannot be altered once inserted, they need to be revoked and re-entere
 triggers that have to rebalance the involved accounts. Whenever the view Balance contains positive
 values for both credit and debt in a line, this indicates transfers yet to be entered.
 
+Using the sqlite3 database purposefully means two things:
+
+ 1. Keep `ReconstructedBankStatement` view in sync with the actual statements received from your bank
+   by entering the incoming and outcoming bank transfers in the Credit or Debit table, respectively,
+   best as soon as they show up.
+
+ 2. Ideally, all records in the `Balance` view must be 0 in each of debit, credit and promised
+   columns. If neither debit nor credit is zero in the same record, you need to make internal transfers
+   linking records from the `CurrentDebts` and from the `AvailableCredits` tables. Otherwise,
+   ensure that members make the transfers they are obligated to and return any money that is paid
+   too much unless the indicated purposes, if any, also refer to dues in certain future.
 
 Installation
 ------------
@@ -48,18 +59,18 @@ need the `sqlite3` binary or any sqlite3 GUI software to run it.
         Use ".open FILENAME" to reopen on a persistent database.
         sqlite> .read schema.sql
         
-        sqlite> .read schema.t.sql
+        sqlite> .read t/schema.sql
         ...
 
 1. Setup the database: `sqlite3 treasure.db < schema.sql`
 
-1. Study the files to learn how to work with the system: `less schema.sql schema.t.???`
+1. Study the files to learn how to work with the system: `less schema.sql t/schema.???`
 
 
 License
 -------
 
-Copyright (c) 2016, Florian Heß
+Copyright (c) 2016, Florian Heß.
 All rights reserved.
 
-(cf. file LICENSE that contains the BSD 3-clause revised license.)
+See details in LICENSE file containing the BSD 3-clause revised license.
