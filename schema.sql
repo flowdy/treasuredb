@@ -216,6 +216,7 @@ BEGIN
         SELECT OLD.Id, t.billId
         FROM Transfer t
           JOIN CurrentDebts cd ON t.billId = cd.billId
+        WHERE OLD.Id = t.fromCredit
     ;
 
 END;
