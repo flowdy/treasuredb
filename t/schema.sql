@@ -1,4 +1,5 @@
 PRAGMA foreign_keys = ON;
+PRAGMA recursive_triggers = ON;
 
 -- To understand the sql below, see the schema.sql file.
 
