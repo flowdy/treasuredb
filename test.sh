@@ -1,5 +1,5 @@
 #!/bin/bash
 source t/schema.sh
-if [ $? ]; then
+if [ $? == 0 ]; then
    echo Tests passed.
 fi
