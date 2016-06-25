@@ -175,7 +175,7 @@ BEGIN
         billId 
     FROM Transfer
     WHERE fromCredit = NEW.Id
-    ORDER BY date DESC
+    ORDER BY timestamp DESC
     LIMIT 1
     ;
 
@@ -212,11 +212,10 @@ CREATE TRIGGER rebalanceIncreasedCredit
 WHEN NEW.value > OLD.spent
 BEGIN
 
-    REPLACE INTO Transfer
-        SELECT OLD.Id AS fromCredit,
-               billId
+    REPLACE INTO Transfer (fromCredit, billId)
+        SELECT OLD.Id, t.billId
         FROM Transfer t
-            JOIN CurrentDebts cd ON t.billId = cd.billId
+          JOIN CurrentDebts cd ON t.billId = cd.billId
     ;
 
 END;
