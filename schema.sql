@@ -141,7 +141,7 @@ CREATE TRIGGER enforceImmutableTransfer
     BEFORE UPDATE ON Transfer
     WHEN OLD.amount IS NOT NULL
 BEGIN
-    SELECT RAISE(FAIL, "Transfer cannot be updated, but needs to be revoked and re-inserted to run triggers");
+    SELECT RAISE(FAIL, "Transfer cannot be updated, but needs to be replaced to make triggers run");
 END;
 
 CREATE TRIGGER enforceiZeroPaidAtStart
@@ -159,6 +159,66 @@ CREATE TRIGGER enforceDebtImmutableOutsideTrigger
 BEGIN
     SELECT RAISE(FAIL, "paid is set and adjusted automatically according to added Transfer records")
     WHERE (NEW.paid + IFNULL((SELECT m FROM _temp WHERE c IS NULL AND d IS NULL),0) ) <> OLD.paid;
+END;
+
+-- When a transfer is revoked, the targetCredit of the associated bill is reduced. Hence we must
+-- check if we can still have paid the debts linked to this transfer in an "is paid from" relation,
+-- otherwise we have to revoke these transfers as well.
+CREATE TRIGGER rebalanceReducedCredit
+    AFTER UPDATE OF value ON Credit
+WHEN NEW.value < OLD.spent
+BEGIN
+
+    REPLACE INTO _temp (d, m)
+    SELECT
+        'from_' || NEW.Id,
+        billId 
+    FROM Transfer
+    WHERE fromCredit = NEW.Id
+    ORDER BY date DESC
+    LIMIT 1
+    ;
+
+    DELETE
+    FROM Transfer
+    WHERE fromCredit = NEW.Id
+      AND billId IN (
+        SELECT billId
+        FROM _temp
+        WHERE c = 'from_' || NEW.Id
+      )
+    ;
+
+    INSERT INTO Transfer (fromCredit, billId)
+        SELECT NEW.Id, m
+        FROM _temp
+        WHERE d = 'from_' || NEW.Id
+          AND NEW.value > (
+              SELECT spent
+              FROM Credit
+              WHERE Id = NEW.Id
+          )
+    ;
+
+    DELETE FROM _temp WHERE d = 'from_' || NEW.Id;
+
+END;
+
+-- When we enter a transfer, the targetCredit of the associated bill might already be the fromCredit
+-- of a transfer for other dues itself. We can update (replace) the transfer for an unfullfilled one.
+-- That way, a transfer may issue recursively chained transfers.
+CREATE TRIGGER rebalanceIncreasedCredit
+    AFTER UPDATE OF value ON Credit
+WHEN NEW.value > OLD.spent
+BEGIN
+
+    REPLACE INTO Transfer
+        SELECT OLD.Id AS fromCredit,
+               billId
+        FROM Transfer t
+            JOIN CurrentDebts cd ON t.billId = cd.billId
+    ;
+
 END;
 
 CREATE TRIGGER enforceFixedDebits
@@ -206,7 +266,8 @@ BEGIN
 END;
 
 CREATE VIEW CurrentDebts AS
-    SELECT debtor,
+    SELECT billId,
+           debtor,
            targetCredit,
            purpose,
            date,
