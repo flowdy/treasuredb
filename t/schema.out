@@ -9,9 +9,9 @@ john:	0	+0	0
 Club:	0	+0	-16250
 alex:	7200	+16250	0
 # Some updates and deletes that could, unless denied, destroy consistency ...
-Error: near line 338: paid is set and adjusted automatically according to added Transfer records
-Error: near line 339: Debt is involved in transfers to revoke at first
-Error: near line 340: FOREIGN KEY constraint failed
+Error: near line 347: paid is set and adjusted automatically according to added Transfer records
+Error: near line 348: Debt is involved in transfers to revoke at first
+Error: near line 349: FOREIGN KEY constraint failed
 # After revoking transactions, you are free to change or delete debts and credits ...
 Club:	7200	+0	0
 alex:	0	+0	0

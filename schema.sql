@@ -58,6 +58,15 @@ BEGIN
        != (SELECT account FROM Credit WHERE Id=NEW.fromCredit)
     ;
 
+  SELECT RAISE(FAIL, "Target of a debit cannot be an incoming payment")
+  FROM Credit c
+    JOIN Debit d ON c.Id = d.targetCredit
+  WHERE c.Id = NEW.fromCredit
+    AND c.value > 0
+  GROUP BY c.Id
+    HAVING count(d.billId) == 0
+  ;
+
   INSERT INTO _temp
      SELECT remainingDebt, remainingCredit, min(remainingDebt,remainingCredit) 
      FROM (SELECT
