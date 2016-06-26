@@ -258,3 +258,41 @@ CREATE VIEW ReconstructedBankStatement AS
   WHERE targetCredit IS NULL    -- exclude internal transfers
   ORDER BY date ASC
 ;
+
+-- History view: All incoming, outgoing payments and internal transfers
+CREATE VIEW History AS
+  SELECT c.date          AS date,
+         c.purpose       AS purpose,
+                            account,
+         c.value         AS credit,
+         NULL            AS debit,
+         NULL            AS contra,    
+         NULL            AS billId
+  FROM Credit AS c
+    LEFT OUTER JOIN Debit AS d ON c.ID=d.targetCredit
+  GROUP BY c.ID
+    HAVING count(d.billId) == 0 -- exclude internal transfers
+  UNION -- internal transfers with account as source
+  SELECT DATE(timestamp) AS date,
+         d.purpose       AS purpose,
+         d.debtor        AS account,
+         NULL            AS credit,
+         t.amount        AS debit,
+         c.account       AS contra,
+         d.billId        AS billId
+  FROM Transfer t
+    LEFT JOIN Credit AS c ON c.Id     = t.fromCredit
+    LEFT JOIN Debit  AS d ON d.billId = t.billId
+  UNION -- internal transfers with account as target
+  SELECT DATE(timestamp) AS date,
+         d.purpose       AS purpose,
+         c.account       AS account,
+         t.amount        AS credit,
+         NULL            AS debit,
+         d.debtor        AS contra,
+         d.billId        AS billId
+  FROM Transfer t
+    LEFT JOIN Debit  AS d ON d.billId = t.billId
+    LEFT JOIN Credit AS c ON c.Id     = t.fromCredit
+  ORDER BY date ASC
+;
