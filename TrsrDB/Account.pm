@@ -12,11 +12,11 @@ __PACKAGE__->has_many(
     { 'foreign.account' => 'self.ID' }
 );
 __PACKAGE__->has_many(
-    debts => 'TrsrDB::Debit',
+    debits => 'TrsrDB::Debit',
     { 'foreign.debtor' => 'self.ID' }
 );
 __PACKAGE__->has_many(
-    current_debts => 'TrsrDB::CurrentDebts',
+    current_arrears => 'TrsrDB::CurrentArrears',
     { 'foreign.debtor' => 'self.ID' }
 );
 __PACKAGE__->has_many(

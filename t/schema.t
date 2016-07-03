@@ -55,10 +55,10 @@ while ( my ($num, $month) = each %months ) {
     });
 }
 
-is $db->resultset("Account")->find("john")->current_debts->count(), 12,
+is $db->resultset("Account")->find("john")->current_arrears->count(), 12,
    "Entering outstanding member fees for john";
 
-$db->resultset("Account")->find("Club")->add_to_debts({
+$db->resultset("Account")->find("Club")->add_to_debits({
     billId => "TWX2016/123",
     targetCredit => 3,
     date => "2016-01-15",
@@ -68,12 +68,19 @@ $db->resultset("Account")->find("Club")->add_to_debts({
 
 is $db->resultset("Debit")->search({ debtor => 'Club' })->single->billId, "TWX2016/123", "Invoicing server hosting for club";
 
-is_deeply { map { $_->ID => {$_->get_columns} } $db->resultset("Balance")->all },
-   { john => { ID => 'john', credit => 7200, debt => 7200,  promised => 0 },
-     Club => { ID => 'Club', credit =>    0, debt => 23450, promised => 7200 },
-     alex => { ID => 'alex', credit =>    0, debt =>     0, promised => 23450 },
-   },
-   "Get balances"
+is_deeply {
+    map { $_->ID => {$_->get_columns} }
+    $db->resultset("Balance")->all
+}, {
+    john => { ID => 'john', credit => 7200, arrears => 7200,  promised => 0 },
+    Club => { ID => 'Club', credit => 0, arrears => 23450, promised => 7200 },
+    alex => { ID => 'alex', credit => 0, arrears => 0, promised => 23450 },
+},
+"Get balances"
 ;    
+
+# Transfer 72 Euro (6 Euro per month) from john's to Club account.
+# Transfer same 72 Euro from Club account to alex hosting the web site.
+is $db->autobalance( (q{*} => q{*}) x 2 ), 14400, 'Automatically balanced credits and debits';
 
 done_testing();

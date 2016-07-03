@@ -16,10 +16,10 @@ CREATE TABLE Debit (
   value INTEGER NOT NULL, -- Euro-Cent
   paid INTEGER DEFAULT 0, -- Euro-Cent, set and changed automatically (Cache)
   FOREIGN KEY (debtor) REFERENCES Account(ID),
-  FOREIGN KEY (targetCredit) REFERENCES Credit(Id)
+  FOREIGN KEY (targetCredit) REFERENCES Credit(credId)
 );
 CREATE TABLE Credit (
-  Id INTEGER PRIMARY KEY NOT NULL,
+  credId INTEGER PRIMARY KEY NOT NULL,
   account NOT NULL, -- Account des Begünstigten
   date DATE NOT NULL,
   purpose NOT NULL, -- as originally indicated in statement of bank account
@@ -41,11 +41,11 @@ CREATE TABLE Credit (
 CREATE TABLE Transfer (
   timestamp DATE DEFAULT CURRENT_TIMESTAMP,
   billId INTEGER NOT NULL,
-  fromCredit INTEGER NOT NULL, 
+  credId INTEGER NOT NULL, 
   amount INTEGER, -- for later traceability, necessary when revoking transfers
   FOREIGN KEY (billId) REFERENCES Debit(billId),
-  FOREIGN KEY (fromCredit) REFERENCES Credit(Id),
-  UNIQUE (billId, fromCredit)
+  FOREIGN KEY (credId) REFERENCES Credit(credId),
+  UNIQUE (billId, credId)
 );
 
 CREATE TABLE IF NOT EXISTS _temp (d, c, m);
@@ -55,15 +55,15 @@ BEGIN
 
   SELECT RAISE(FAIL, "It is not the debtor who is set to pay")
     WHERE (SELECT debtor FROM Debit WHERE billId=NEW.billId)
-       != (SELECT account FROM Credit WHERE Id=NEW.fromCredit)
+       != (SELECT account FROM Credit WHERE credId=NEW.credId)
     ;
 
   SELECT RAISE(FAIL, "Target of a debit cannot be an incoming payment")
   FROM Credit c
-    JOIN Debit d ON c.Id = d.targetCredit
-  WHERE c.Id = NEW.fromCredit
+    JOIN Debit d ON c.credId = d.targetCredit
+  WHERE c.credId = NEW.credId
     AND c.value > 0
-  GROUP BY c.Id
+  GROUP BY c.credId
     HAVING count(d.billId) == 0
   ;
 
@@ -71,7 +71,7 @@ BEGIN
      SELECT remainingDebt, remainingCredit, min(remainingDebt,remainingCredit) 
      FROM (SELECT
          (SELECT value - paid FROM Debit WHERE billId=NEW.billId) AS remainingDebt, 
-         (SELECT value - spent FROM Credit WHERE Id=NEW.fromCredit) AS remainingCredit
+         (SELECT value - spent FROM Credit WHERE credId=NEW.credId) AS remainingCredit
      )
   ;
 
@@ -86,7 +86,7 @@ BEGIN
 
   UPDATE Credit
       SET value = value + (SELECT m FROM _temp)
-      WHERE Id = (
+      WHERE credId = (
           SELECT targetCredit
           FROM Debit
           WHERE billId=NEW.billId
@@ -99,11 +99,11 @@ BEGIN
         ELSE
           (SELECT m FROM _temp)
       END
-      WHERE Id=NEW.fromCredit;
+      WHERE credId=NEW.credId;
 
   UPDATE Transfer
       SET amount = (SELECT m FROM _temp)
-      WHERE billId=NEW.billId AND fromCredit=NEW.fromCredit
+      WHERE billId=NEW.billId AND credId=NEW.credId
         ;
 
   DELETE FROM _temp;
@@ -123,7 +123,7 @@ BEGIN
 
   UPDATE Credit
       SET value = value - OLD.amount
-      WHERE Id = (
+      WHERE credId = (
           SELECT targetCredit
           FROM Debit
           WHERE billId=OLD.billId
@@ -131,7 +131,7 @@ BEGIN
 
   UPDATE Credit
       SET spent = spent - OLD.amount
-      WHERE Id = OLD.fromCredit;
+      WHERE credId = OLD.credId;
 
   DELETE FROM _temp;
 
@@ -171,40 +171,40 @@ BEGIN
 
     REPLACE INTO _temp (d, m)
     SELECT
-        'from_' || NEW.Id,
+        'from_' || NEW.credId,
         billId 
     FROM Transfer
-    WHERE fromCredit = NEW.Id
+    WHERE credId = NEW.credId
     ORDER BY timestamp DESC
     LIMIT 1
     ;
 
     DELETE
     FROM Transfer
-    WHERE fromCredit = NEW.Id
+    WHERE credId = NEW.credId
       AND billId IN (
         SELECT billId
         FROM _temp
-        WHERE c = 'from_' || NEW.Id
+        WHERE c = 'from_' || NEW.credId
       )
     ;
 
-    INSERT INTO Transfer (fromCredit, billId)
-        SELECT NEW.Id, m
+    INSERT INTO Transfer (credId, billId)
+        SELECT NEW.credId, m
         FROM _temp
-        WHERE d = 'from_' || NEW.Id
+        WHERE d = 'from_' || NEW.credId
           AND NEW.value > (
               SELECT spent
               FROM Credit
-              WHERE Id = NEW.Id
+              WHERE credId = NEW.credId
           )
     ;
 
-    DELETE FROM _temp WHERE d = 'from_' || NEW.Id;
+    DELETE FROM _temp WHERE d = 'from_' || NEW.credId;
 
 END;
 
--- When we enter a transfer, the targetCredit of the associated bill might already be the fromCredit
+-- When we enter a transfer, the targetCredit of the associated bill might already be the credId
 -- of a transfer for other dues itself. We can update (replace) the transfer for an unfullfilled one.
 -- That way, a transfer may issue recursively chained transfers.
 CREATE TRIGGER rebalanceIncreasedCredit
@@ -212,11 +212,11 @@ CREATE TRIGGER rebalanceIncreasedCredit
 WHEN NEW.value > OLD.spent
 BEGIN
 
-    REPLACE INTO Transfer (fromCredit, billId)
-        SELECT OLD.Id, t.billId
+    REPLACE INTO Transfer (credId, billId)
+        SELECT OLD.credId, t.billId
         FROM Transfer t
-          JOIN CurrentDebts cd ON t.billId = cd.billId
-        WHERE OLD.Id = t.fromCredit
+          JOIN CurrentArrears ca ON t.billId = ca.billId
+        WHERE OLD.credId = t.credId
     ;
 
 END;
@@ -239,7 +239,7 @@ END;
 -- when new transfer records are inserted
 CREATE TRIGGER enforceSpentImmutableOutsideTrigger
     BEFORE UPDATE OF spent ON Credit
-    WHEN NOT EXISTS (SELECT * FROM Transfer t WHERE NEW.Id=t.fromCredit AND amount IS NULL)
+    WHEN NOT EXISTS (SELECT * FROM Transfer t WHERE NEW.credId=t.credId AND amount IS NULL)
 BEGIN
     SELECT RAISE(FAIL, "spent is set and adjusted automatically according to added Transfer records")
     WHERE (NEW.spent + IFNULL((SELECT m FROM _temp WHERE c IS NULL AND d IS NULL),0) ) <> OLD.spent;
@@ -249,7 +249,7 @@ CREATE TRIGGER enforceFixedCredit
     BEFORE UPDATE OF value ON Credit
 BEGIN
     SELECT RAISE(FAIL, "Credit involved in transactions to revoke at first")
-    WHERE EXISTS (SELECT * FROM Transfer WHERE fromCredit=NEW.Id);
+    WHERE EXISTS (SELECT * FROM Transfer WHERE credId=NEW.credId);
 END;
 
 CREATE TRIGGER checkIBANatTransfer
@@ -265,7 +265,7 @@ BEGIN
    WHERE fnd IS NULL OR fnd = 0;
 END;
 
-CREATE VIEW CurrentDebts AS
+CREATE VIEW CurrentArrears AS
     SELECT billId,
            debtor,
            targetCredit,
@@ -277,7 +277,7 @@ CREATE VIEW CurrentDebts AS
 ;
       
 CREATE VIEW AvailableCredits AS
-    SELECT account, purpose, date,
+    SELECT credId, account, purpose, date,
            value - spent AS difference
     FROM Credit
     WHERE value != spent
@@ -287,13 +287,13 @@ CREATE VIEW Balance AS
   SELECT Account.ID             AS ID,
       IFNULL(ac.allCredits,0)   AS credit,
       IFNULL(pr.allPromises, 0) AS promised,
-      IFNULL(cd.allDebts, 0)    AS debt
+      IFNULL(ca.allArrears, 0)  AS arrears
   FROM Account
      LEFT OUTER JOIN (
-         SELECT debtor, sum(difference) AS allDebts
-         FROM CurrentDebts
+         SELECT debtor, sum(difference) AS allArrears
+         FROM CurrentArrears
          GROUP BY debtor
-     )                          AS cd ON Account.ID=cd.debtor
+     )                          AS ca ON Account.ID=ca.debtor
      LEFT OUTER JOIN (
          SELECT account, sum(difference) AS allCredits
          FROM AvailableCredits
@@ -301,8 +301,8 @@ CREATE VIEW Balance AS
      )                          AS ac ON Account.ID=ac.account
      LEFT OUTER JOIN (
          SELECT a.ID AS ID, sum(difference) AS allPromises
-         FROM CurrentDebts cd
-             JOIN Credit c ON cd.targetCredit = c.Id
+         FROM CurrentArrears ca
+             JOIN Credit c ON ca.targetCredit = c.credId
              JOIN Account a ON a.ID = c.account
          GROUP BY a.ID
      )                          AS pr ON Account.ID=pr.ID
@@ -315,8 +315,8 @@ CREATE VIEW ReconstructedBankStatement AS
          c.value   AS credit,
          NULL      AS debit
   FROM Credit AS c
-    LEFT OUTER JOIN Debit AS d ON c.ID=d.targetCredit
-  GROUP BY c.ID
+    LEFT OUTER JOIN Debit AS d ON c.credId=d.targetCredit
+  GROUP BY c.credId
     HAVING count(d.billId) == 0 -- exclude internal transfers
   UNION
   SELECT date,
@@ -339,8 +339,8 @@ CREATE VIEW History AS
          NULL            AS contra,    
          NULL            AS billId
   FROM Credit AS c
-    LEFT OUTER JOIN Debit AS d ON c.ID=d.targetCredit
-  GROUP BY c.ID
+    LEFT OUTER JOIN Debit AS d ON c.credId=d.targetCredit
+  GROUP BY c.credId
     HAVING count(d.billId) == 0 -- exclude internal transfers
   UNION -- internal transfers with account as source
   SELECT DATE(timestamp) AS date,
@@ -351,7 +351,7 @@ CREATE VIEW History AS
          c.account       AS contra,
          d.billId        AS billId
   FROM Transfer t
-    LEFT JOIN Credit AS c ON c.Id     = t.fromCredit
+    LEFT JOIN Credit AS c ON c.credId = t.credId
     LEFT JOIN Debit  AS d ON d.billId = t.billId
   UNION -- internal transfers with account as target
   SELECT DATE(timestamp) AS date,
@@ -363,6 +363,6 @@ CREATE VIEW History AS
          d.billId        AS billId
   FROM Transfer t
     LEFT JOIN Debit  AS d ON d.billId = t.billId
-    LEFT JOIN Credit AS c ON c.Id     = t.fromCredit
+    LEFT JOIN Credit AS c ON c.credId = t.credId
   ORDER BY date ASC
 ;

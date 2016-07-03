@@ -27,15 +27,15 @@ INSERT INTO Debit VALUES ("MB1605-john", "john", 1, "2016-05-01", "Membership fe
 SELECT "ID:	credit	promise debt";
 SELECT "--------------------------------";
 
-SELECT ID || ":", credit, '+' || promised, debt * -1 FROM Balance WHERE ID in ("john", "Club");
+SELECT ID || ":", credit, '+' || promised, arrears * -1 FROM Balance WHERE ID in ("john", "Club");
 
 SELECT "# Reflect john paying its bills all at once ...";
-INSERT INTO Transfer (billId, fromCredit) VALUES ("MB1605-john", 2), ("MB1606-john", 2), ("MB1607-john", 2), ("MB1608-john", 2), ("MB1609-john", 2), ("MB1610-john", 2), ("MB1611-john", 2), ("MB1612-john", 2), ("MB1701-john", 2), ("MB1702-john", 2), ("MB1703-john", 2), ("MB1704-john", 2); 
-SELECT ID || ":", credit, '+' || promised, debt * -1 FROM Balance WHERE ID in ("john", "Club");
+INSERT INTO Transfer (billId, credId) VALUES ("MB1605-john", 2), ("MB1606-john", 2), ("MB1607-john", 2), ("MB1608-john", 2), ("MB1609-john", 2), ("MB1610-john", 2), ("MB1611-john", 2), ("MB1612-john", 2), ("MB1701-john", 2), ("MB1702-john", 2), ("MB1703-john", 2), ("MB1704-john", 2); 
+SELECT ID || ":", credit, '+' || promised, arrears * -1 FROM Balance WHERE ID in ("john", "Club");
 
 SELECT "# Charge Club with server hosting provided by alex ...";
-INSERT INTO Transfer (billId, fromCredit) VALUES ("TWX2016/123", 1);
-SELECT ID || ":", credit, '+' || promised, debt * -1 FROM Balance WHERE ID in ("Club", "alex");
+INSERT INTO Transfer (billId, credId) VALUES ("TWX2016/123", 1);
+SELECT ID || ":", credit, '+' || promised, arrears * -1 FROM Balance WHERE ID in ("Club", "alex");
 
 SELECT "# Some updates and deletes that could, unless denied, destroy consistency ...";
 UPDATE Debit SET paid = 20000 WHERE billId="TWX2016/123";
@@ -47,11 +47,11 @@ BEGIN TRANSACTION;
 DELETE FROM Transfer WHERE billId="TWX2016/123";
 UPDATE Debit SET value = 20000 WHERE billId="TWX2016/123";
 DELETE FROM Debit WHERE billId="TWX2016/123"; -- *SHOULD* work
-SELECT ID || ":", credit, '+' || promised, debt * -1 FROM Balance WHERE ID in ("Club", "alex");
+SELECT ID || ":", credit, '+' || promised, arrears * -1 FROM Balance WHERE ID in ("Club", "alex");
 ROLLBACK TRANSACTION;
 
 SELECT '# But let''s rollback that what-if excurse. This is how it currently is ...';
-SELECT ID || ":", credit, '+' || promised, debt * -1 FROM Balance WHERE ID in ("Club", "alex");
+SELECT ID || ":", credit, '+' || promised, arrears * -1 FROM Balance WHERE ID in ("Club", "alex");
 
 SELECT '###################################################################';
 SELECT '# Now it is your turn: Study the sql code yielding the output above';
