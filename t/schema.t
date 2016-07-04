@@ -1,7 +1,7 @@
 use strict;
 
 my $db;
-use TrsrDB \$db => 'trsr.db';
+use TrsrDB \$db => $ENV{TRSRDB_SQLITE_FILE};
 use Test::More;
 
 $db->resultset("Account")->create({ ID => "Club", altId => 1, type => 'eV' }); 

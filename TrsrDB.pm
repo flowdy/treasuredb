@@ -14,7 +14,7 @@ sub import {
     return if @_ == 1;
     croak "use TrsrDB \$your_db_handle missing" if !defined $dbh_ref;
     $$dbh_ref = $class->connect(
-        "DBI:SQLite:" . ($filename // ":memory:"),
+        "DBI:SQLite:" . ($filename // $ENV{TRSRDB_SQLITE_FILE} // ":memory:"),
         "", "", {
            sqlite_unicode => 1,
            on_connect_call => 'use_foreign_keys',
