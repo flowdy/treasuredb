@@ -46,7 +46,7 @@ my %months = (
 while ( my ($num, $month) = each %months ) {
     my $yy = substr $month, -2;
     $db->resultset("Debit")->create({
-        billId => "MB$yy$num-john",
+        billId => "MB$yy$num/john",
         debtor => "john",
         targetCredit => 1,
         date => "16-05-01",
@@ -70,17 +70,60 @@ is $db->resultset("Debit")->search({ debtor => 'Club' })->single->billId, "TWX20
 
 is_deeply {
     map { $_->ID => {$_->get_columns} }
-    $db->resultset("Balance")->all
+    $db->resultset("Balance")->search(
+        {}, { columns => [qw|ID available arrears promised|] }
+    )
 }, {
-    john => { ID => 'john', credit => 7200, arrears => 7200,  promised => 0 },
-    Club => { ID => 'Club', credit => 0, arrears => 23450, promised => 7200 },
-    alex => { ID => 'alex', credit => 0, arrears => 0, promised => 23450 },
+    john => { ID=>'john', available=>7200, arrears=>7200, promised=>0 },
+    Club => { ID=>'Club', available=>0, arrears=>23450, promised=>7200 },
+    alex => { ID=>'alex', available=>0, arrears=>0, promised=>23450 },
 },
-"Get balances"
+"Get balances before transfers"
 ;    
 
 # Transfer 72 Euro (6 Euro per month) from john's to Club account.
 # Transfer same 72 Euro from Club account to alex hosting the web site.
-is $db->autobalance( (q{*} => q{*}) x 2 ), 14400, 'Automatically balanced credits and debits';
+is $db->make_transfers( (q{*} => q{*}) x 2 ), 14400, 'Automatically balanced credits and debits';
+
+is_deeply {
+    map { $_->ID => {$_->get_columns} }
+    $db->resultset("Balance")->search(
+        {}, { columns => [qw|ID available arrears promised|] }
+    )
+}, {
+    john => { ID=>'john', available=>0, arrears=>0, promised=>0 },
+    Club => { ID=>'Club', available=>0, arrears=>16250, promised=>0 },
+    alex => { ID=>'alex', available=>7200, arrears=>0, promised=>16250 },
+},
+"Get balances after transfers"
+;    
+
+$db->resultset("Account")->create({ ID => "rose", altId => 45, type => 'member' }); 
+%months = (
+    '07' => 'July 2016',     '08' => 'August 2016',
+    '09' => 'September 2016', '10' => 'October 2016',  '11' => 'November 2016', '12' => 'December 2016',
+);
+while ( my ($num, $month) = each %months ) {
+    my $yy = substr $month, -2;
+    $db->resultset("Debit")->create({
+        billId => "MB$yy$num/rose",
+        debtor => "rose",
+        targetCredit => 1,
+        date => "16-07-10",
+        purpose => "Membership fee $month",
+        value => 600
+    });
+}
+
+my $rose = $db->resultset("Account")->find("rose");
+$rose->add_to_credits({
+    value => 7200, purpose => "Membership fees until 6/17",
+    date => '16-08-12'
+});
+
+$db->make_transfers( q{*} => q{*} );
+
+is $rose->available_credits->get_column("difference")->sum, 3600, "partial use of credit";
+is $db->resultset("Balance")->find("alex")->earned, '10800', 'indirect transfers';
 
 done_testing();

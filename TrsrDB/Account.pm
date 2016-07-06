@@ -30,5 +30,9 @@ __PACKAGE__->has_many(
 __PACKAGE__->has_one(
     balance => 'TrsrDB::Balance', 'ID'
 );
+__PACKAGE__->has_many(
+    history => 'TrsrDB::History',
+    { 'foreign.account' => 'self.ID' }
+);
 
 1;

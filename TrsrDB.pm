@@ -23,7 +23,7 @@ sub import {
     );
 }
 
-sub autobalance {
+sub make_transfers {
     my ($self, @pairs) = @_;
 
     my $from_to = [
@@ -32,7 +32,7 @@ sub autobalance {
     ];
     my $to_from = [
         undef, CurrentArrears => 'billId',
-        payable_with => 'Id', undef
+        payable_with => 'credId', undef
     ];
 
     my $transfers = $self->resultset('Transfer');

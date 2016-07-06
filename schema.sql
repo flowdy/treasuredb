@@ -85,19 +85,13 @@ BEGIN
       WHERE billId=NEW.billId;
 
   UPDATE Credit
-      SET value = value + (SELECT m FROM _temp)
-      WHERE credId = (
-          SELECT targetCredit
-          FROM Debit
-          WHERE billId=NEW.billId
-      );
-
-  UPDATE Credit
       SET spent = spent + CASE
         WHEN (SELECT c FROM _temp) <= 0
           THEN RAISE(FAIL, "Credit spent")
-        ELSE
-          (SELECT m FROM _temp)
+        ELSE IFNULL(
+          (SELECT m FROM _temp),
+          RAISE(FAIL,"Oops, lost _temp record before increasing spent")
+        )
       END
       WHERE credId=NEW.credId;
 
@@ -105,6 +99,17 @@ BEGIN
       SET amount = (SELECT m FROM _temp)
       WHERE billId=NEW.billId AND credId=NEW.credId
         ;
+
+  UPDATE Credit
+      SET value = value + IFNULL(
+          (SELECT m FROM _temp),
+          RAISE(FAIL, "Oops, lost _temp record before increasing value")
+      )
+      WHERE credId = (
+          SELECT targetCredit
+          FROM Debit
+          WHERE billId=NEW.billId
+      );
 
   DELETE FROM _temp;
 
@@ -245,12 +250,12 @@ BEGIN
     WHERE (NEW.spent + IFNULL((SELECT m FROM _temp WHERE c IS NULL AND d IS NULL),0) ) <> OLD.spent;
 END;
 
-CREATE TRIGGER enforceFixedCredit
-    BEFORE UPDATE OF value ON Credit
-BEGIN
-    SELECT RAISE(FAIL, "Credit involved in transactions to revoke at first")
-    WHERE EXISTS (SELECT * FROM Transfer WHERE credId=NEW.credId);
-END;
+-- CREATE TRIGGER enforceFixedCredit
+--     BEFORE UPDATE OF value ON Credit
+-- BEGIN
+--     SELECT RAISE(FAIL, "Credit involved in transactions to revoke at first")
+--     WHERE EXISTS (SELECT * FROM Transfer WHERE credId=NEW.credId);
+-- END;
 
 CREATE TRIGGER checkIBANatTransfer
     BEFORE INSERT ON Debit
@@ -283,11 +288,43 @@ CREATE VIEW AvailableCredits AS
     WHERE value != spent
 ;
       
+
+-- Log of internal transfers
+CREATE VIEW History AS
+  -- internal transfers with account as source
+  SELECT DATE(timestamp) AS date,
+         d.purpose       AS purpose,
+         d.debtor        AS account,
+         NULL            AS credit,
+         t.amount        AS debit,
+         c.account       AS contra,
+         d.billId        AS billId
+  FROM Transfer t
+    LEFT JOIN Debit  AS d ON d.billId = t.billId
+    LEFT JOIN Credit AS c ON c.credId = d.targetCredit
+  -- internal transfers with account as target
+  UNION
+  SELECT DATE(timestamp) AS date,
+         d.purpose       AS purpose,
+         c.account       AS account,
+         t.amount        AS credit,
+         NULL            AS debit,
+         d.debtor        AS contra,
+         d.billId        AS billId
+  FROM Transfer t
+    LEFT JOIN Debit  AS d ON d.billId = t.billId
+    LEFT JOIN Credit AS c ON c.credId = d.targetCredit
+  ORDER BY date ASC
+;
+
 CREATE VIEW Balance AS
   SELECT Account.ID             AS ID,
-      IFNULL(ac.allCredits,0)   AS credit,
+      IFNULL(ac.allCredits,0)   AS available,
+      IFNULL(hi.credit,0)       AS earned,
+      IFNULL(hi.debit,0)        AS spent,
       IFNULL(pr.allPromises, 0) AS promised,
-      IFNULL(ca.allArrears, 0)  AS arrears
+      IFNULL(ca.allArrears, 0)  AS arrears,
+      even.until                AS even_until
   FROM Account
      LEFT OUTER JOIN (
          SELECT debtor, sum(difference) AS allArrears
@@ -306,6 +343,21 @@ CREATE VIEW Balance AS
              JOIN Account a ON a.ID = c.account
          GROUP BY a.ID
      )                          AS pr ON Account.ID=pr.ID
+     LEFT OUTER JOIN (
+         SELECT account,
+                sum(credit) AS credit,
+                sum(debit) AS debit
+         FROM History
+         GROUP BY account
+     )                          AS hi ON Account.ID=hi.account
+     LEFT OUTER JOIN (
+         SELECT d.debtor     AS account,
+                max(d.date)  AS until
+         FROM Debit d
+             LEFT OUTER JOIN CurrentArrears ca ON d.debtor = ca.debtor
+         GROUP BY d.debtor, ca.debtor
+         HAVING d.date <= IFNULL( min(ca.date), d.date )
+     )                          AS even ON Account.ID=even.account
   ;
 
 CREATE VIEW ReconstructedBankStatement AS
@@ -326,43 +378,5 @@ CREATE VIEW ReconstructedBankStatement AS
          value      AS debit
   FROM Debit
   WHERE targetCredit IS NULL    -- exclude internal transfers
-  ORDER BY date ASC
-;
-
--- History view: All incoming, outgoing payments and internal transfers
-CREATE VIEW History AS
-  SELECT c.date          AS date,
-         c.purpose       AS purpose,
-                            account,
-         c.value         AS credit,
-         NULL            AS debit,
-         NULL            AS contra,    
-         NULL            AS billId
-  FROM Credit AS c
-    LEFT OUTER JOIN Debit AS d ON c.credId=d.targetCredit
-  GROUP BY c.credId
-    HAVING count(d.billId) == 0 -- exclude internal transfers
-  UNION -- internal transfers with account as source
-  SELECT DATE(timestamp) AS date,
-         d.purpose       AS purpose,
-         d.debtor        AS account,
-         NULL            AS credit,
-         t.amount        AS debit,
-         c.account       AS contra,
-         d.billId        AS billId
-  FROM Transfer t
-    LEFT JOIN Credit AS c ON c.credId = t.credId
-    LEFT JOIN Debit  AS d ON d.billId = t.billId
-  UNION -- internal transfers with account as target
-  SELECT DATE(timestamp) AS date,
-         d.purpose       AS purpose,
-         c.account       AS account,
-         t.amount        AS credit,
-         NULL            AS debit,
-         d.debtor        AS contra,
-         d.billId        AS billId
-  FROM Transfer t
-    LEFT JOIN Debit  AS d ON d.billId = t.billId
-    LEFT JOIN Credit AS c ON c.credId = t.credId
   ORDER BY date ASC
 ;
