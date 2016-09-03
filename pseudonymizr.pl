@@ -22,11 +22,16 @@ of course.
 
 This script pseudonymizes lines from standard input and writes them to
 standard output. All strings that need to be replaced must be wrapped into
-a special marker, namely X{...}, where X can be any upper- or lowercase letter of the alphabet, denoting a certain category of information, e.g. "M" for
-member names.
+a special marker, namely X{...}, where X can be any upper- or lowercase
+letter of the alphabet, denoting a certain category of information, e.g.
+"M" for member names.
 
-Caution with natural member names! Slightly differing content of M{...} clauses lead to completely different pseudonyms. In order not to render the tests
-irreversible and in disaccord with actual states, because the association of members and accounts is wrong, you should prefer using it for the unique and standard member ID, say the number in the member table. Where proper names in financial transfer information, use a different letter. 
+Caution with natural member names! Slightly differing content of M{...}
+clauses lead to completely different pseudonyms. In order not to render
+the tests irreversible and in disaccord with actual states, because the
+association of members and accounts is wrong, you should prefer using it
+for the unique and standard member ID, say the number in the member table.
+Where proper names in financial transfer information, use a different letter. 
 
 =head1 COMMAND
 
@@ -61,13 +66,13 @@ if ( $registry_fh ) {
     
     my ($orig, $random);
     my ($h1, $h2, $assign) = $reverse_mode
-        ? (\%subst => \%known, sub { ($random, $orig) = @_ })
-        : (\%known => \%subst, sub { ($orig, $random) = @_ })
+        ? (\%subst => \%known)
+        : (\%known => \%subst)
         ;
 
     while ( $_ = <$registry_fh> ) {
         chomp;
-        $assign->( split /\t/ );
+        my ($random, $orig) = split /\t/;
         $h1->{ $random } = $orig;
     }
     %$h2 = reverse %$h1;
@@ -95,13 +100,13 @@ unless ( $reverse_mode ) {
 
 sub pseudonymize { my $orig = shift; $subst{ $orig } //= do {{
 
-    # Zufallsstring der Länge $LENGTH erzeugen
-    my $random = join q{}, map { $CHARS[ rand 62 ] } 1 .. $LENGTH;
+    # Make random string with $LENGTH characters from @CHARS
+    my $random = join q{}, map { $CHARS[ rand @CHARS ] } 1 .. $LENGTH;
 
-    # If known, try anew (p = 1 : 62 ^ $LENGTH, i.e. p > 0)
-    $_ = $_ ? redo : $orig for $known{ $random };
+    # If known, try anew (p = 1 : @CHARS ^ $LENGTH, i.e. p > 0)
+    $_ = defined($_) ? redo : $orig for $known{ $random };
 
-    # in $subst speichern
+    # return to %subst cache
     $random;
 
 }}; }       
