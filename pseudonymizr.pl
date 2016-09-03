@@ -62,7 +62,7 @@ if ( $registry_fh ) {
     my ($orig, $random);
     my ($h1, $h2, $assign) = $reverse_mode
         ? (\%subst => \%known, sub { ($random, $orig) = @_ })
-        : (\%known => \%known, sub { ($orig, $random) = @_ })
+        : (\%known => \%subst, sub { ($orig, $random) = @_ })
         ;
 
     while ( $_ = <$registry_fh> ) {
