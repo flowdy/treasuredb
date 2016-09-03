@@ -64,12 +64,7 @@ open $registry_fh, '<:utf8', $registry_file
 
 if ( $registry_fh ) {
     
-    my ($orig, $random);
-    my ($h1, $h2, $assign) = $reverse_mode
-        ? (\%subst => \%known)
-        : (\%known => \%subst)
-        ;
-
+    my ($h1, $h2) = $reverse_mode ? (\%subst => \%known) : (\%known => \%subst);
     while ( $_ = <$registry_fh> ) {
         chomp;
         my ($random, $orig) = split /\t/;
