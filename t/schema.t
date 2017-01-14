@@ -49,7 +49,7 @@ while ( my ($num, $month) = each %months ) {
         billId => "MB$yy$num/john",
         debtor => "john",
         targetCredit => 1,
-        date => "16-05-01",
+        date => "$yy-$num-01",
         purpose => "Membership fee $month",
         value => 600
     });

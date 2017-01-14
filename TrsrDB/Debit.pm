@@ -18,6 +18,11 @@ __PACKAGE__->belongs_to(
     { 'foreign.ID' => 'self.debtor' }
 );
 
+__PACKAGE__->might_have(
+    target => 'TrsrDB::Credit',
+    { 'foreign.credId' => 'self.targetCredit' }
+);
+
 __PACKAGE__->has_many(
     incomings => 'TrsrDB::Transfer', 'billId'
 );

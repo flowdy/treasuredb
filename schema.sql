@@ -43,12 +43,18 @@ CREATE TABLE Transfer (
   billId INTEGER NOT NULL,
   credId INTEGER NOT NULL, 
   amount INTEGER, -- for later traceability, necessary when revoking transfers
+  note,
   FOREIGN KEY (billId) REFERENCES Debit(billId),
   FOREIGN KEY (credId) REFERENCES Credit(credId),
   UNIQUE (billId, credId)
 );
 
-CREATE TABLE IF NOT EXISTS _temp (d, c, m);
+-- For internal purposes: Memory of rebalance triggers
+CREATE TABLE _temp (d, c, m);
+
+-- Only for use of HTTP interface
+CREATE TABLE web_auth ( user_id primary key, password, grade not null, username, email );
+
 CREATE TRIGGER balanceTransfer
      AFTER INSERT ON Transfer 
 BEGIN
@@ -149,7 +155,7 @@ BEGIN
     SELECT RAISE(FAIL, "Transfer cannot be updated, but needs to be replaced to make triggers run");
 END;
 
-CREATE TRIGGER enforceiZeroPaidAtStart
+CREATE TRIGGER enforceZeroPaidAtStart
     BEFORE INSERT ON Debit
 BEGIN
     SELECT RAISE(FAIL, "Debt must be initially unpaid")
@@ -226,8 +232,8 @@ BEGIN
 
 END;
 
-CREATE TRIGGER enforceFixedDebits
-    BEFORE UPDATE OF value ON Debit
+CREATE TRIGGER enforceFixedDebit
+    BEFORE UPDATE OF debtor, transferCredit, value ON Debit
     WHEN EXISTS (SELECT * FROM Transfer WHERE billId=NEW.billId)
 BEGIN
     SELECT RAISE(FAIL, "Debt is involved in transfers to revoke at first");
@@ -250,12 +256,13 @@ BEGIN
     WHERE (NEW.spent + IFNULL((SELECT m FROM _temp WHERE c IS NULL AND d IS NULL),0) ) <> OLD.spent;
 END;
 
--- CREATE TRIGGER enforceFixedCredit
---     BEFORE UPDATE OF value ON Credit
--- BEGIN
---     SELECT RAISE(FAIL, "Credit involved in transactions to revoke at first")
---     WHERE EXISTS (SELECT * FROM Transfer WHERE credId=NEW.credId);
--- END;
+CREATE TRIGGER enforceFixedCredit
+    BEFORE UPDATE OF account, value ON Credit
+    WHEN NOT EXISTS (SELECT * FROM _temp)
+BEGIN
+    SELECT RAISE(FAIL, "Credit involved in transactions to revoke at first")
+    WHERE EXISTS (SELECT * FROM Transfer WHERE credId=NEW.credId);
+END;
 
 CREATE TRIGGER checkIBANatTransfer
     BEFORE INSERT ON Debit
@@ -367,7 +374,7 @@ CREATE VIEW ReconstructedBankStatement AS
          c.value   AS credit,
          NULL      AS debit
   FROM Credit AS c
-    LEFT OUTER JOIN Debit AS d ON c.credId=d.targetCredit
+    LEFT OUTER JOIN Debit AS d ON c.credId = d.targetCredit
   GROUP BY c.credId
     HAVING count(d.billId) == 0 -- exclude internal transfers
   UNION
@@ -379,4 +386,52 @@ CREATE VIEW ReconstructedBankStatement AS
   FROM Debit
   WHERE targetCredit IS NULL    -- exclude internal transfers
   ORDER BY date ASC
+;
+
+-- Credits that have not been used yet and any subsequent ones
+CREATE VIEW CreditsInFocus AS
+  SELECT account, date, credId, value, purpose
+  FROM Credit
+  WHERE value > spent
+  UNION
+  SELECT c.account, date, credId, value, purpose
+  FROM Credit c
+    JOIN Balance b ON b.ID = c.account
+  WHERE c.date >= b.even_until
+  GROUP BY c.credId
+;
+
+-- Report view may be of use in communication with club members who are due
+-- of outstanding fees, listing what they have paid and what is yet to pay.
+CREATE VIEW Report AS
+  SELECT *
+  FROM (
+    SELECT account, date, credId, value, purpose        -- relevant incomes
+    FROM CreditsInFocus
+    UNION
+    SELECT debtor        AS account,                    -- partial payments
+           DATE(t.timestamp)
+                         AS date,
+           t.credId      AS credId,
+           t.amount * -1 AS value,
+           d.purpose || ' [' || d.billId || ']'
+             || CASE WHEN t.note IS NULL
+                  THEN ''
+                  ELSE ( x'0a' || '(' || t.note || ')' )
+                END
+                         AS purpose
+    FROM Debit d
+      JOIN Transfer t ON t.billId = d.billId
+      JOIN CreditsInFocus fc ON fc.credId=t.credId
+    UNION
+    SELECT debtor          AS account,                  -- current arrears
+           date,
+           NULL            AS credId,
+           difference * -1 AS value,
+           purpose || ' [' || billId || ']'
+                   || x'0a' || '(YET TO PAY)'
+    FROM CurrentArrears
+  )
+  ORDER BY account, credId IS NULL, credId,
+    value < 0, date ASC
 ;

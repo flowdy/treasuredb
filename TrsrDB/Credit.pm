@@ -19,7 +19,12 @@ __PACKAGE__->belongs_to(
 
 __PACKAGE__->has_many(
     outgoings => 'TrsrDB::Transfer',
-    { 'foreign.fromCredit' => 'self.Id' }
+    { 'foreign.fromCredit' => 'self.credId' }
+);
+
+__PACKAGE__->has_many(
+    income => 'TrsrDB::Debit',
+    { 'foreign.targetCredit' => 'self.credId' }
 );
 
 __PACKAGE__->many_to_many(

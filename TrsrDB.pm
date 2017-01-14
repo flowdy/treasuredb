@@ -6,7 +6,7 @@ use Carp qw/croak/;
 
 __PACKAGE__->load_classes(qw|
     Account Debit Credit Transfer CurrentArrears AvailableCredits
-    Balance ReconstructedBankStatement History
+    Balance Report ReconstructedBankStatement History User
 |);
 
 sub import {
@@ -41,15 +41,15 @@ sub make_transfers {
     
     while ( my ($src, $tgt) = splice @pairs, 0, 2 ) {
 
-        $rs = $self->resultset("AvailableCredits")->search({
-            credId => [ -or => _expand_ids($src) ]
-        });
+        $rs = $self->resultset("AvailableCredits")->search(
+            expand_ids($src => 'credId' )
+        );
         $src = [ $rs->get_column('credId')->all ];
         $src_total += $rs->get_column('difference')->sum;
 
-        $rs = $self->resultset("CurrentArrears")->search({
-            billId => [ -or => _expand_ids( $tgt ) ]
-        });
+        $rs = $self->resultset("CurrentArrears")->search(
+            expand_ids( $tgt => 'billId' )
+        );
         $tgt = [ $rs->get_column('billId')->all ];
         $tgt_total += $rs->get_column('difference')->sum;
 
@@ -99,31 +99,42 @@ sub make_transfers {
 
 }
 
-sub _expand_ids {
-    my ($ids) = @_;
+sub expand_ids {
+    my ($ids, $default_slot) = @_;
     my @ids = map { m{ \A (\d+) - (\d+) \z }xms ? [ $1 .. $2 ] : $_ }
               ref $ids ? @$ids : split q{,}, $ids
             ;
-    my (@alternatives, @raws);
+    my (@alternatives, %raws);
     for my $id ( @ids ) {
+
+        my $slot = ref $id ? $default_slot
+                 : $id =~ s{^p(urpose)?:}{}i ? "purpose"
+                 : $id =~ s{^d(ate)?:}{}i ? "date"
+                 : $id =~ s{^v(alue)?:}{}i ? "value"
+                 : $default_slot
+                 ;
+
         if ( ref $id eq 'ARRAY' ) {
-            push @raws, @$ids;
+            $raws{$slot}{'-in'}, @$ids;
         }
         elsif ( $id eq '*' ) {
-           @alternatives = ({ -not_in => [] });
+           @alternatives = ( $slot => { -not_in => [] });
         }
         elsif (
             $id =~ s{([%*_?])}{
                 $1 eq '*' ? '%' : $1 eq '?' ? '_' : $1
             }eg
         ) {
-           push @alternatives, { -like => $id };
+           push @alternatives, { $slot => { -like => $id } };
         }
-        else {
-           push @raws, $id;
-        }
+        else { push @{ $raws{$slot}{'-like'} }, $id }
     }
-    push @alternatives, @raws ? { -in => \@raws } : ();
+    while ( my @v = each %raws ) { push @alternatives, { @v } }
     return \@alternatives;
 }
+
+sub user {
+    shift->resultset("User")->find(shift);
+}
+
 1;

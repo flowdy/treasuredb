@@ -8,6 +8,7 @@ __PACKAGE__->add_column("timestamp" => { data_type => 'TIMESTAMP' });
 __PACKAGE__->add_column("billId");
 __PACKAGE__->add_column("credId" => { data_type => 'INTEGER' });
 __PACKAGE__->add_column("amount" => { data_type => 'INTEGER', nullable => 1 });
+__PACKAGE__->add_column("note" => { nullable => 1 });
 __PACKAGE__->set_primary_key("billId", "credId");
 
 __PACKAGE__->belongs_to(
