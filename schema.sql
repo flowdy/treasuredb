@@ -50,7 +50,7 @@ CREATE TABLE Transfer (
 );
 
 -- For internal purposes: Memory of rebalance triggers
-CREATE TABLE _temp (d, c, m);
+CREATE TABLE __DO_NOT_MANIPULATE__trigger_memory (d, c, m);
 
 -- Only for use of HTTP interface
 CREATE TABLE web_auth ( user_id primary key, password, grade not null, username, email );
@@ -73,7 +73,7 @@ BEGIN
     HAVING count(d.billId) == 0
   ;
 
-  INSERT INTO _temp
+  INSERT INTO __DO_NOT_MANIPULATE__trigger_memory
      SELECT remainingDebt, remainingCredit, min(remainingDebt,remainingCredit) 
      FROM (SELECT
          (SELECT value - paid FROM Debit WHERE billId=NEW.billId) AS remainingDebt, 
@@ -83,33 +83,33 @@ BEGIN
 
   UPDATE Debit
       SET paid = paid + CASE
-        WHEN (SELECT d FROM _temp) <= 0
+        WHEN (SELECT d FROM __DO_NOT_MANIPULATE__trigger_memory) <= 0
           THEN RAISE(FAIL, "Debt settled")
         ELSE
-          (SELECT m FROM _temp)
+          (SELECT m FROM __DO_NOT_MANIPULATE__trigger_memory)
       END
       WHERE billId=NEW.billId;
 
   UPDATE Credit
       SET spent = spent + CASE
-        WHEN (SELECT c FROM _temp) <= 0
+        WHEN (SELECT c FROM __DO_NOT_MANIPULATE__trigger_memory) <= 0
           THEN RAISE(FAIL, "Credit spent")
         ELSE IFNULL(
-          (SELECT m FROM _temp),
-          RAISE(FAIL,"Oops, lost _temp record before increasing spent")
+          (SELECT m FROM __DO_NOT_MANIPULATE__trigger_memory),
+          RAISE(FAIL,"Oops, lost __DO_NOT_MANIPULATE__trigger_memory record before increasing spent")
         )
       END
       WHERE credId=NEW.credId;
 
   UPDATE Transfer
-      SET amount = (SELECT m FROM _temp)
+      SET amount = (SELECT m FROM __DO_NOT_MANIPULATE__trigger_memory)
       WHERE billId=NEW.billId AND credId=NEW.credId
         ;
 
   UPDATE Credit
       SET value = value + IFNULL(
-          (SELECT m FROM _temp),
-          RAISE(FAIL, "Oops, lost _temp record before increasing value")
+          (SELECT m FROM __DO_NOT_MANIPULATE__trigger_memory),
+          RAISE(FAIL, "Oops, lost __DO_NOT_MANIPULATE__trigger_memory record before increasing value")
       )
       WHERE credId = (
           SELECT targetCredit
@@ -117,7 +117,7 @@ BEGIN
           WHERE billId=NEW.billId
       );
 
-  DELETE FROM _temp;
+  DELETE FROM __DO_NOT_MANIPULATE__trigger_memory;
 
 END;
 
@@ -125,7 +125,7 @@ CREATE TRIGGER revokeTransfer
     BEFORE DELETE ON Transfer
 BEGIN
 
-  INSERT INTO _temp VALUES (null,null,OLD.amount);
+  INSERT INTO __DO_NOT_MANIPULATE__trigger_memory VALUES (null,null,OLD.amount);
 
   UPDATE Debit
       SET paid = paid - OLD.amount
@@ -144,7 +144,7 @@ BEGIN
       SET spent = spent - OLD.amount
       WHERE credId = OLD.credId;
 
-  DELETE FROM _temp;
+  DELETE FROM __DO_NOT_MANIPULATE__trigger_memory;
 
 END;
 
@@ -169,7 +169,9 @@ CREATE TRIGGER enforceDebtImmutableOutsideTrigger
     WHEN NOT EXISTS (SELECT * FROM Transfer t WHERE NEW.billId=t.billId AND amount IS NULL)
 BEGIN
     SELECT RAISE(FAIL, "paid is set and adjusted automatically according to added Transfer records")
-    WHERE (NEW.paid + IFNULL((SELECT m FROM _temp WHERE c IS NULL AND d IS NULL),0) ) <> OLD.paid;
+    WHERE (NEW.paid + IFNULL(
+            (SELECT m FROM __DO_NOT_MANIPULATE__trigger_memory WHERE c IS NULL AND d IS NULL), 0
+        ) ) <> OLD.paid;
 END;
 
 -- When a transfer is revoked, the targetCredit of the associated bill is reduced. Hence we must
@@ -180,7 +182,7 @@ CREATE TRIGGER rebalanceReducedCredit
 WHEN NEW.value < OLD.spent
 BEGIN
 
-    REPLACE INTO _temp (d, m)
+    REPLACE INTO __DO_NOT_MANIPULATE__trigger_memory (d, m)
     SELECT
         'from_' || NEW.credId,
         billId 
@@ -195,14 +197,14 @@ BEGIN
     WHERE credId = NEW.credId
       AND billId IN (
         SELECT billId
-        FROM _temp
+        FROM __DO_NOT_MANIPULATE__trigger_memory
         WHERE c = 'from_' || NEW.credId
       )
     ;
 
     INSERT INTO Transfer (credId, billId)
         SELECT NEW.credId, m
-        FROM _temp
+        FROM __DO_NOT_MANIPULATE__trigger_memory
         WHERE d = 'from_' || NEW.credId
           AND NEW.value > (
               SELECT spent
@@ -211,7 +213,7 @@ BEGIN
           )
     ;
 
-    DELETE FROM _temp WHERE d = 'from_' || NEW.credId;
+    DELETE FROM __DO_NOT_MANIPULATE__trigger_memory WHERE d = 'from_' || NEW.credId;
 
 END;
 
@@ -253,15 +255,17 @@ CREATE TRIGGER enforceSpentImmutableOutsideTrigger
     WHEN NOT EXISTS (SELECT * FROM Transfer t WHERE NEW.credId=t.credId AND amount IS NULL)
 BEGIN
     SELECT RAISE(FAIL, "spent is set and adjusted automatically according to added Transfer records")
-    WHERE (NEW.spent + IFNULL((SELECT m FROM _temp WHERE c IS NULL AND d IS NULL),0) ) <> OLD.spent;
+    WHERE (NEW.spent + IFNULL(
+            (SELECT m FROM __DO_NOT_MANIPULATE__trigger_memory WHERE c IS NULL AND d IS NULL), 0
+        ) ) <> OLD.spent;
 END;
 
 CREATE TRIGGER enforceFixedCredit
     BEFORE UPDATE OF account, value ON Credit
-    WHEN NOT EXISTS (SELECT * FROM _temp)
+    WHEN EXISTS (SELECT * FROM Transfer WHERE credId=NEW.credId)
+     AND NOT EXISTS (SELECT * FROM __DO_NOT_MANIPULATE__trigger_memory)
 BEGIN
-    SELECT RAISE(FAIL, "Credit involved in transactions to revoke at first")
-    WHERE EXISTS (SELECT * FROM Transfer WHERE credId=NEW.credId);
+    SELECT RAISE(FAIL, "Credit involved in transactions to revoke at first");
 END;
 
 CREATE TRIGGER checkIBANatTransfer
