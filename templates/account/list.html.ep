@@ -16,22 +16,23 @@
 % }
 % my $u = $account->ID;
 <tr><th><%= $u %></th>
-   <td class="even_until"><%= $bal->even_until // "never" %></td><td class="number"><%= $bal->arrears %></td><td><a href="<%= $u %>/debits">list</td><td><a href="<%= $u %>/out">add</a></td>
+   <td class="even_until"><%= $bal->even_until // "never" %></td><td class="number"><%== money $bal->arrears %></td><td><a href="<%= $u %>/debits">list</td><td><a href="<%= $u %>/out">add</a></td>
 <td class="centered">
 % my $which = ($bal->arrears && 1) + ($bal->available && 1);
 % if ( $which == 2 ) {
    <a class="transfer-btn" href="<%= $u %>/transfer">C&hArr;D!</a>
 % }
 % elsif ( $which ) {
-   <span style="background-color:rgba(224,224,0,0.4);">N/A</span>
+   <span style="background-color:rgba(224,224,0,0.4);">&nbsp;N/A&nbsp;</span>
 % }
 % else {
-   <span  style="background-color:rgba(0,224,0,0.4);">N/A</span>
+   <span  style="background-color:rgba(0,224,0,0.4);">&nbsp;N/A&nbsp;</span>
 % }
-   </td><td class="number"><%= $bal->available %></td><td><a href="<%= $u %>/credits">list</a></td><td><a href="<%= $u %>/in">add</a></td><td class="number"><%= $bal->earned %></td><td class="number"><%= $bal->promised %></td><td><a href="<%= $u %>/history">History</a></td><td><a href="<%= $u %>/report">Report</a></td></tr>
+   </td><td class="number"><%== money $bal->available %></td><td><a href="<%= $u %>/credits">list</a></td><td><a href="<%= $u %>/in">add</a></td><td class="number"><%== money $bal->earned %></td><td class="number"><%== money $bal->promised %></td><td><a href="<%= $u %>/history">History</a></td><td><a href="<%= $u %>/report">Report</a></td></tr>
 % } # while
 </table>
 
+<p style="text-align:center;"><a href="/bankStatement">Reconstructed bank statement</a></p>
 <div class="help">
 <h2>Column explanation</h2>
 <dl>

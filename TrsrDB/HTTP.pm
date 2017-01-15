@@ -32,6 +32,16 @@ sub startup {
       user => undef,
   );
 
+  $self->helper(money => sub {
+      my (undef, $cent) = @_;
+      return if !defined $cent;
+      my $c100 = $cent =~ s{ (\d{0,2}) \z }{}xms && sprintf("%02d", $1); 
+      $cent ||= 0;
+      return qq{<strong>$cent</strong>.$c100};
+  });
+  $self->helper(nl2br => sub {
+      pop =~ s{\n}{<br>}grms;
+  });
 
   if ( my $l = $ENV{LOG} ) {
       use Mojo::Log;
@@ -53,6 +63,13 @@ sub startup {
 
   $auth->get( '/logout' )->to("user#logout");
 
+  my $check = $auth->under(sub { shift->stash('grade') })->get('/');
+  $check->get('/bankStatement' => sub {
+      my $c = shift;
+      $c->stash( records => $c->app->db->resultset("ReconstructedBankStatement") );
+      $c->render('bankStatement');
+  });
+
   my $admin = $auth->under(sub { shift->stash('grade') > 1 });
   $admin->any('/admin')->to('admin#dash');
   $admin->post('/:account/in')->to('credit#upsert');
@@ -67,13 +84,6 @@ sub startup {
   $admin->get('/:action')->to(controller => 'admin');
 
   $auth->get('/')->to('account#list')->name('home');
-
-  my $check = $auth->under(sub { shift->stash('grade') })->get('/');
-  $check->get('/bankStatement')->to(sub {
-      my $c = shift;
-      $c->stash( records => $c->app->db->resultset("ReconstructedBankStatement") );
-      $c->render('bankStatement');
-  });
 
   my $account = $auth->get('/:account')->under(sub {
       my $c = shift;

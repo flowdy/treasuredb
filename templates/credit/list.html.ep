@@ -3,6 +3,6 @@
 <table class="income">
 <tr><th>Id</th><th>Date</th><th>Purpose</th><th>value</th><th>spent</th></tr>
 % while ( my $credit = $credits->next ) {
-<tr><td class="number"><a href="/credit/<%= $credit->credId %>"><%= $credit->credId %></a></td><td><%= $credit->date %></td><td><%= $credit->purpose %></td><td class="number"><%= $credit->value %></td><td class="number"><%= $credit->spent %></td></tr>
+<tr><td class="number"><a href="/credit/<%= $credit->credId %>"><%= $credit->credId %></a></td><td><%= $credit->date %></td><td><%== nl2br $credit->purpose %></td><td class="number"><%== money $credit->value %></td><td class="number"><%== money $credit->spent %></td></tr>
 % }
 </table>

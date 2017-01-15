@@ -1,8 +1,8 @@
 % title 'Bank statement';
 
 <table>
-<tr><th>Date</th><th>Account</th><th>Purpose</th><th>Debit</th><th>Credit</th></tr>
+<tr><th>Date</th><th>Purpose</th><th>Account</th><th>Debit</th><th>Credit</th></tr>
 % while ( my $record = $records->next ) {
-<tr><td><%= $record->date %></td><td><%= $record->account %></td><td><%= $record->purpose %></td><td><%= $record->debit %></td><td><%= $record->credit %></td></tr>
+<tr><td><%= $record->date %></td><td><%= $record->purpose %></td><td><%= $record->account %></td><td><%= $record->debit %></td><td><%= $record->credit %></td></tr>
 % } 
 </table>

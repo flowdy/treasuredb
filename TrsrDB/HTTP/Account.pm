@@ -31,13 +31,15 @@ sub transfer {
     my $db = $self->app->db;
     my $account = $db->resultset("Account")->find( $self->stash("account") );
     
-    if ( $self->req->method eq 'GET' ) {
-        $self->stash(
-            credits => $account->available_credits_rs,
-            arrears => $account->current_arrears_rs,
-        );
-        return;
-    }
+    my $credits = $account->available_credits;
+    my $arrears = $account->current_arrears;
+
+    return $self->redirect_to('home')
+        if !( $credits->count() && $arrears->count() );
+
+    $self->stash( credits => $credits, arrears => $arrears );
+
+    return if $self->req->method ne 'POST'; 
 
     $db->make_transfers(
         $self->every_param('credits')
@@ -47,5 +49,19 @@ sub transfer {
     return;
 
 }
+
+sub report {
+    my $self = shift;
+    my $account = $self->app->db
+                ->resultset("Account")
+                ->find( $self->stash("account") )
+                ;
+
+    $self->stash( report => $account->report->search_rs(
+        {}, { order_by => { -asc => [qw/date/] } }
+    ) );
+
+}
+
 1;
 

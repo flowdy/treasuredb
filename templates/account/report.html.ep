@@ -1,0 +1,8 @@
+% title 'Account report';
+
+<table>
+<tr><th>Date</th><th>Value</th><th>Purpose</th></tr>
+% while ( my $record = $report->next ) {
+<tr><td><%= $record->date %></td><td class="number"><%== money $record->value %></td><td><%== nl2br $record->purpose %></td></tr>
+% } 
+</table>

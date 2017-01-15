@@ -70,8 +70,8 @@ oops
 %            my $c = $t->credit; 
 <tr><td><input type="checkbox" name="revoke" value="<%= $t->credId %>"></td>
     <td><%= $t->timestamp %></td>
-    <td><%= $c->purpose %></td>
-    <td><%= $t->amount %></td>
+    <td><%== nl2br $c->purpose %></td>
+    <td><%== money $t->amount %></td>
     <td><%= $t->note %></td>
 </tr>
 %        }
@@ -93,8 +93,8 @@ oops
 %        while ( my $d = $credits->next ) {
 <tr><td><input type="checkbox" name="payWith" value="<%= $d->credId %>"></td>
     <td><%= $d->date %></td>
-    <td><%= $d->purpose %></td>
-    <td><%= $d->difference %></td>
+    <td><%== nl2br $d->purpose %></td>
+    <td><%== money $d->difference %></td>
 </tr>
 %        }
 </table>

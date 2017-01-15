@@ -42,6 +42,7 @@ a.transfer-btn {
     font-weight: bold;
     border: 2px outset rgb(224,32,0);
     text-decoration: none;
+    border-radius: 3px;
 }
 
 table td.even_until {

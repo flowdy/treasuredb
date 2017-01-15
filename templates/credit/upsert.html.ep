@@ -43,8 +43,8 @@
 %            my $d = $t->debit; 
 <tr><td><input type="checkbox" name="revoke" value="<%= $t->billId %>"></td>
     <td><%= $t->timestamp %></td>
-    <td><%= $d->purpose %></td>
-    <td><%= $t->amount %></td>
+    <td><%== nl2br $d->purpose %></td>
+    <td class="number"><%== money $t->amount %></td>
     <td><%= $t->note %></td>
 </tr>
 %        }
@@ -66,8 +66,8 @@
 %        while ( my $d = $arrears->next ) {
 <tr><td><input type="checkbox" name="spendFor" value="<%= $d->billId %>"></td>
     <td><%= $d->date %></td>
-    <td><%= $d->purpose %></td>
-    <td><%= $d->difference %></td>
+    <td><%== nl2br $d->purpose %></td>
+    <td class="number"><%== money $d->difference %></td>
 </tr>
 %        }
 </table>

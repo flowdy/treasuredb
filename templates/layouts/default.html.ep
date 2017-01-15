@@ -17,5 +17,6 @@
 % }
 <%= content %>
 
+<p style="text-align:center;"><a href="<%= url_for "home" %>">Back home – Account List</p>
 </body>
 </html>
