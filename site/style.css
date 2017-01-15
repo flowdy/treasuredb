@@ -1,0 +1,64 @@
+html {
+    margin: 0 auto;
+    max-width: 800px;
+}
+
+body {
+    font-family: sans-serif;
+    padding: .5em;
+}
+
+h1 {
+    text-align: center;
+    border-bottom: 5px double grey;
+}
+
+table tr:nth-child(even) {
+    background-color: #eee;
+}
+table tr:nth-child(odd) {
+    background-color: #ddd;
+}
+
+table.accounts col.transfer {
+    text-align: center;
+}
+
+table.accounts td > a {
+    font-variant: small-caps;
+}
+
+table td.centered {
+    text-align: center;
+}
+
+table td.number {
+    text-align: right;
+    font-family: monospace;
+}
+
+a.transfer-btn {
+    background-color:rgba(224,32,0,0.4);
+    font-weight: bold;
+    border: 2px outset rgb(224,32,0);
+    text-decoration: none;
+}
+
+table td.even_until {
+    text-align: center;
+}
+
+dl dd + dt {
+    border-top: 1px solid lightgrey;
+    margin-top: 1em;
+}
+
+select {
+    border:none;
+    background-color:transparent;
+}
+
+.help {
+    color: lightgrey;
+    font-size: .8em;
+}

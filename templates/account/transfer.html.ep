@@ -1,0 +1,39 @@
+% title 'Make transfers';
+
+<p>Check at least one item of each table that belong together.</p>
+
+<form method="post">
+
+<h2>Available credits</h2>
+
+<p>Check credits you want to <strong>pay above debit(s)</strong> with.</p>
+
+<table>
+<tr><th>S</th><th>date</th><th>purpose</th><th>to spend</th></tr>
+%        while ( my $d = $credits->next ) {
+<tr><td><input type="checkbox" name="credits" value="<%= $d->credId %>"></td>
+    <td><%= $d->date %></td>
+    <td><%= $d->purpose %></td>
+    <td><%= $d->difference %></td>
+</tr>
+%        }
+</table>
+
+<h2>Current arrears</h2>
+
+<p>Check arrears you want to <strong>use this credit</strong> for.</p>
+<table>
+<tr><th>S</th><th>date</th><th>purpose</th><th>to pay</th></tr>
+%        while ( my $d = $arrears->next ) {
+<tr><td><input type="checkbox" name="debits" value="<%= $d->billId %>"></td>
+    <td><%= $d->date %></td>
+    <td><%= $d->purpose %></td>
+    <td><%= $d->difference %></td>
+</tr>
+% }
+</table>
+
+<p><button type="submit">Make transfers</button>
+<a href="<%= url_for('home') %>">Return to account list</a></p>
+
+</form>

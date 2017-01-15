@@ -1,0 +1,109 @@
+% my $id = stash 'id';
+% title $id ? "Change debit $id" : "Enter new debit";
+
+<form method="post">
+<h2>Essentials</h2>
+
+% my %r;
+% $r{billId} = begin
+    <input id="billId" name="billId" value="<%= $debit->billId %>">
+% end
+% $r{date} = begin
+    <input id="date" name="date" value="<%= $debit->date %>"> (Format: YYYY-MM-DD)
+% end
+% $r{purpose} = begin
+    <input id="purpose" name="purpose" style="width:100%" value="<%= $debit->purpose %>">
+% end
+% $r{value} = begin
+    <input id="value" name="value" value="<%= $debit->value %>"> Cent
+% end
+% $r{targetCredit} = begin
+%   if ( !@$targets ) {
+<p style="color:red;">There are no target credits available. Target credits are credits of other accounts that either still have a value of 0, or which have already been targetted. Please create a target credit record first, because all debits must refer to one so settlements can be fulfilled.</p>
+%       $targets = [ ['', '', ''] ];
+oops
+%   }
+%   my $cmpacc = $targets->[0][1];
+%   my $target = $debit->targetCredit // '';
+<select id="targetCredit" title="<%= $targets_count %>" name="targetCredit">
+    <option value="">-- Please select (mandatory) --</option>
+    <optgroup label="<%= $cmpacc %>">
+% for my $tc ( @$targets ) {
+%   my $newacc = $tc->[1];
+%   if ( $newacc ne $cmpacc ) {
+%       $cmpacc = $newacc;
+    </optgroup>
+    <optgroup label="<%= $cmpacc %>">
+%   }
+        <option value="<%= $tc->[0] %>" <%== $tc->[0] eq $target ? 'selected="selected"' :'' %>>
+            <%= $tc->[2] %>
+        </option>
+% }
+    </optgroup>
+</select>
+% end
+% $r{debtor} = begin
+    <input id="debtor" name="debtor" value="<%= $debit->debtor %>">
+% end
+
+<dl class="upsert">
+% for my $f ( $debit->result_source->columns ) {
+% my $renderer = $r{$f} // do {
+%     my $value = $debit->$f // next;
+%     begin
+    <%= $value  %>
+%     end
+% };
+<dt><label for="<%= $f %>"><%= $f %>: </label></dt>
+<dd><%= $renderer->() %></dd>
+% }
+</dl>
+
+% if ( $debit->in_storage ) {
+%    my $i = $debit->incomings;
+%    if ( $i->count() ) {
+<h2>Incomings</h2>
+<p>If you want to <strong>revoke</strong> any incomings, just check those.</p>
+<table>
+<tr><th>R</th><th>timestamp</th><th>paid</th><th>value</th><th>note</th></tr>
+%        while ( my $t = $i->next ) {
+%            my $c = $t->credit; 
+<tr><td><input type="checkbox" name="revoke" value="<%= $t->credId %>"></td>
+    <td><%= $t->timestamp %></td>
+    <td><%= $c->purpose %></td>
+    <td><%= $t->amount %></td>
+    <td><%= $t->note %></td>
+</tr>
+%        }
+</table>
+%    }
+%    else {
+<p>Debit not paid, yet.</p>
+%    }
+% }
+
+% my $account = stash('account');
+% if ( $account ||= $debit->debtor ) {
+<h2>Pay with credits</h2>
+%    my $credits = app->db->resultset("Account")->find($account)->available_credits;
+%    if ( $credits->count() ) {
+<p>Check credits you want to <strong>pay this debit</strong> with.</p>
+<table>
+<tr><th>S</th><th>date</th><th>purpose</th><th>to spend</th></tr>
+%        while ( my $d = $credits->next ) {
+<tr><td><input type="checkbox" name="payWith" value="<%= $d->credId %>"></td>
+    <td><%= $d->date %></td>
+    <td><%= $d->purpose %></td>
+    <td><%= $d->difference %></td>
+</tr>
+%        }
+</table>
+%    }
+%    else {
+<p>Currently no credits available.</p>
+%    }
+% }
+
+<button type="submit">Submit</button>
+
+</form>

@@ -306,22 +306,25 @@ CREATE VIEW History AS
   SELECT DATE(timestamp) AS date,
          d.purpose       AS purpose,
          d.debtor        AS account,
-         NULL            AS credit,
+         t.credId        AS credId,
          t.amount        AS debit,
-         c.account       AS contra,
-         d.billId        AS billId
+         NULL            AS credit,
+         d.targetCredit  AS contra,
+         d.billId        AS billId,
+         t.note          AS note
   FROM Transfer t
     LEFT JOIN Debit  AS d ON d.billId = t.billId
-    LEFT JOIN Credit AS c ON c.credId = d.targetCredit
   -- internal transfers with account as target
   UNION
   SELECT DATE(timestamp) AS date,
          d.purpose       AS purpose,
          c.account       AS account,
-         t.amount        AS credit,
+         d.targetCredit  AS credId,
          NULL            AS debit,
-         d.debtor        AS contra,
-         d.billId        AS billId
+         t.amount        AS credit,
+         t.credId        AS contra,
+         d.billId        AS billId,
+         t.note          AS note
   FROM Transfer t
     LEFT JOIN Debit  AS d ON d.billId = t.billId
     LEFT JOIN Credit AS c ON c.credId = d.targetCredit
@@ -367,7 +370,11 @@ CREATE VIEW Balance AS
          FROM Debit d
              LEFT OUTER JOIN CurrentArrears ca ON d.debtor = ca.debtor
          GROUP BY d.debtor, ca.debtor
-         HAVING d.date <= IFNULL( min(ca.date), d.date )
+         HAVING COUNT(
+             -- Restricts the counting to the settled debts:
+             CASE d.value WHEN d.paid THEN 1 ELSE NULL END
+           ) -- Considers that there might be no current arrears:
+           AND d.date <= IFNULL( min(ca.date), '9999-99-99' )
      )                          AS even ON Account.ID=even.account
   ;
 

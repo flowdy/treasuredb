@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initial-scale=1, minimum-scale=1" />
+  <title>TrsrDB<% if (my $t = title) { %>: <%= $t %><% } %></title>
+  <link rel="stylesheet" type="text/css"
+     href="/style.css" media="screen,projection">
+% my $scripts = stash 'addScripts';
+% for my $script ( @$scripts ) {
+  <script src="/scripts/<%= $script %>.js"></script>
+% }
+</head>
+<body>
+% if ( my $t = title ) {
+<h1>Treasure DB: <%= $t %></h1>
+% }
+<%= content %>
+
+</body>
+</html>

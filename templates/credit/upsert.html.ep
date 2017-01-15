@@ -1,0 +1,82 @@
+% my $id = stash 'id';
+% title $id ? "Change credit $id" : "Enter new credit";
+
+<form method="post">
+<h2>Essentials</h2>
+
+% my %r;
+% $r{date} = begin
+    <input id="date" name="date" value="<%= $credit->date %>"> (Format: YYYY-MM-DD)
+% end
+% $r{purpose} = begin
+    <input id="purpose" name="purpose" style="width:100%" value="<%= $credit->purpose %>">
+% end
+% $r{value} = begin
+    <input id="value" name="value" value="<%= $credit->value %>"> Cent (declare target credit with "0")
+% end
+% $r{account} = begin
+    <input id="account" name="account" value="<%= $credit->account->ID %>">
+% end
+
+<dl class="upsert">
+% for my $f ( $credit->result_source->columns ) {
+% my $renderer = $r{$f} // do {
+%     my $value = $credit->$f // next;
+%     begin
+    <%= $value  %>
+%     end
+% };
+<dt><label for="<%= $f %>"><%= $f %>:</label></dt>
+<dd><%= $renderer->() %></dd>
+% }
+</dl>
+
+
+% if ( $credit->in_storage ) {
+%    my $o = $credit->outgoings;
+%    if ( $o->count() ) {
+<h2>Outgoings</h2>
+<p>If you want to <strong>revoke</strong> any outgoings, please check those.</p>
+<table>
+<tr><th>R</th><th>timestamp</th><th>paid</th><th>value</th><th>note</th></tr>
+%        while ( my $t = $o->next ) {
+%            my $d = $t->debit; 
+<tr><td><input type="checkbox" name="revoke" value="<%= $t->billId %>"></td>
+    <td><%= $t->timestamp %></td>
+    <td><%= $d->purpose %></td>
+    <td><%= $t->amount %></td>
+    <td><%= $t->note %></td>
+</tr>
+%        }
+</table>
+%    }
+%    else {
+<p>Credit not used, yet.</p>
+%    }
+% }
+
+% my $account = stash('account');
+% if ( $account //= $credit->account ) {
+<h2>Spend for arrears</h2>
+%    my $arrears = ( ref $account ? $account : app->db->resultset("Account")->find($account) )->current_arrears;
+%    if ( $arrears->count() ) {
+<p>Check arrears you want to <strong>use this credit</strong> for.</p>
+<table>
+<tr><th>S</th><th>date</th><th>purpose</th><th>to pay</th></tr>
+%        while ( my $d = $arrears->next ) {
+<tr><td><input type="checkbox" name="spendFor" value="<%= $d->billId %>"></td>
+    <td><%= $d->date %></td>
+    <td><%= $d->purpose %></td>
+    <td><%= $d->difference %></td>
+</tr>
+%        }
+</table>
+%    }
+%    else {
+<p>Currently no arrears to pay.</p>
+%    }
+% }
+
+<button type="submit">Submit</button>
+
+</form>

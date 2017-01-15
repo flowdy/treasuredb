@@ -1,0 +1,16 @@
+% title 'Transfer history';
+
+<p>Reverse ordered list:</p>
+
+<table>
+<tr><th>Timestamp</th><th>Purpose (own/other/debit)</th><th>debit</th><th>credit</th><th>note</th></tr>
+% while ( my $hr = $history->next ) {
+<tr><td><%= $hr->date %></td><td>
+% my $this = $hr->this_credit;
+<strong>On <a href="/credit/<%= $hr->credId %>"><%= <%= $this->credId %></a>:</strong> <%= $this->purpose %><br>
+% my $that = $hr->that_credit;
+<strong>With <%= $that->account->ID %>/<a href="/credit/<%= $that->credId %>"><%= <%= $that->credId %></a>:</strong> <%= $that->purpose %><br>
+<strong>Pay <%= $hr->billId %>:</strong> <%= $hr->purpose %>
+</td><td class="number"><%= $hr->debit %></td><td class="number"><%= $hr->credit %></td><td><%= $hr->note %></td></tr>
+% }
+</table>

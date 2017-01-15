@@ -18,8 +18,7 @@ __PACKAGE__->belongs_to(
 );
 
 __PACKAGE__->has_many(
-    outgoings => 'TrsrDB::Transfer',
-    { 'foreign.fromCredit' => 'self.credId' }
+    outgoings => 'TrsrDB::Transfer', 'credId'
 );
 
 __PACKAGE__->has_many(

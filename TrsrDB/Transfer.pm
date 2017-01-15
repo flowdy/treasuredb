@@ -16,7 +16,7 @@ __PACKAGE__->belongs_to(
 );
 
 __PACKAGE__->belongs_to(
-   debit => 'TrsrDB::Credit', 'billId'
+   debit => 'TrsrDB::Debit', 'billId'
 );
 
 1;

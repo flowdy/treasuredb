@@ -41,8 +41,8 @@ Using the sqlite3 database purposefully means two things:
    ensure that members make the transfers they are obligated to and return any money that is paid
    too much unless the indicated purposes, if any, also refer to dues in certain future.
 
-Installation
-------------
+Basic Installation
+------------------
 
 As it is a SQLite3 database with all consistency and calculatory logic built in, you only
 need the `sqlite3` binary or any sqlite3 GUI software to run it.
@@ -66,6 +66,11 @@ need the `sqlite3` binary or any sqlite3 GUI software to run it.
 
 1. Study the files to learn how to work with the system: `less schema.sql t/schema.???`
 
+HTTP interface
+--------------
+
+Treasure DB includes a rudimentary HTTP interface. It requires Mojolicious. The interface
+is developped and tested on version 7.13 onwards. 
 
 License
 -------
@@ -73,4 +78,4 @@ License
 Copyright (c) 2016, Florian Heß.
 All rights reserved.
 
-See details in LICENSE file containing the BSD 3-clause revised license.
+See details in LICENSE file containing the General Public license, version 3.
