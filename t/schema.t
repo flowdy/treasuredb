@@ -4,7 +4,7 @@ my $db;
 use TrsrDB \$db => $ENV{TRSRDB_SQLITE_FILE};
 use Test::More;
 
-$db->resultset("Account")->create({ ID => "Club", altId => 1, type => 'eV' }); 
+$db->resultset("Account")->create({ ID => "Club", altId => 1, type => '' }); 
 $db->resultset("Account")->create({ ID => "john", altId => 44, type => 'Member' }); 
 $db->resultset("Account")->create({
     ID => "alex", altId => 6, type => 'Member',
@@ -49,7 +49,7 @@ while ( my ($num, $month) = each %months ) {
         billId => "MB$yy$num/john",
         debtor => "john",
         targetCredit => 1,
-        date => "$yy-$num-01",
+        date => "20$yy-$num-01",
         purpose => "Membership fee $month",
         value => 600
     });
@@ -98,7 +98,7 @@ is_deeply {
 "Get balances after transfers"
 ;    
 
-$db->resultset("Account")->create({ ID => "rose", altId => 45, type => 'member' }); 
+$db->resultset("Account")->create({ ID => "rose", altId => 45, type => 'Member' }); 
 %months = (
     '07' => 'July 2016',     '08' => 'August 2016',
     '09' => 'September 2016', '10' => 'October 2016',  '11' => 'November 2016', '12' => 'December 2016',
@@ -109,7 +109,7 @@ while ( my ($num, $month) = each %months ) {
         billId => "MB$yy$num/rose",
         debtor => "rose",
         targetCredit => 1,
-        date => "16-07-10",
+        date => "2016-07-10",
         purpose => "Membership fee $month",
         value => 600
     });
@@ -118,7 +118,7 @@ while ( my ($num, $month) = each %months ) {
 my $rose = $db->resultset("Account")->find("rose");
 $rose->add_to_credits({
     value => 7200, purpose => "Membership fees until 6/17",
-    date => '16-08-12'
+    date => '2016-08-12'
 });
 
 $db->make_transfers( q{*} => q{*} );
