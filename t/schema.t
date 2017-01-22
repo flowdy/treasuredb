@@ -125,5 +125,6 @@ $db->make_transfers( q{*} => q{*} );
 
 is $rose->available_credits->get_column("difference")->sum, 3600, "partial use of credit";
 is $db->resultset("Balance")->find("alex")->earned, '10800', 'indirect transfers';
+is $db->resultset("Balance")->find("Club")->available, '0', '   ... spent increased';
 
 done_testing();

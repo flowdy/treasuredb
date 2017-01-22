@@ -1,27 +1,11 @@
 CREATE TRIGGER revokeTransfer
     BEFORE DELETE ON Transfer
+    WHEN OLD.amount > 0
 BEGIN
 
-  INSERT INTO __DO_NOT_MANIPULATE__trigger_memory VALUES (null,null,OLD.amount);
-
-  UPDATE Debit
-      SET paid = paid - OLD.amount
-      WHERE billId=OLD.billId
-      ;
-
-  UPDATE Credit
-      SET value = value - OLD.amount
-      WHERE credId = (
-          SELECT targetCredit
-          FROM Debit
-          WHERE billId=OLD.billId
-      );
-
-  UPDATE Credit
-      SET spent = spent - OLD.amount
-      WHERE credId = OLD.credId;
-
-  DELETE FROM __DO_NOT_MANIPULATE__trigger_memory;
+  INSERT INTO __INTERNAL_TRIGGER_STACK VALUES (
+      OLD.ROWID, OLD.billId, OLD.credId, -OLD.amount
+  );
 
 END;
 

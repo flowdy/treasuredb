@@ -3,11 +3,12 @@
 -- That way, a transfer may issue recursively chained transfers.
 CREATE TRIGGER rebalanceIncreasedCredit
     AFTER UPDATE OF value ON Credit
-WHEN NEW.value > OLD.spent
+    WHEN NEW.value > OLD.value
 BEGIN
 
-    REPLACE INTO Transfer (credId, billId)
-        SELECT OLD.credId, t.billId
+    INSERT INTO __INTERNAL_TRIGGER_STACK
+        SELECT t.ROWID, NEW.value, ca.difference,
+            min(ca.difference, NEW.value - OLD.value)
         FROM Transfer t
           JOIN CurrentArrears ca ON t.billId = ca.billId
         WHERE OLD.credId = t.credId

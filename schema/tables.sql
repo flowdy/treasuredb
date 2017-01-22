@@ -59,7 +59,8 @@ CREATE TABLE Transfer (
 );
 
 -- For internal purposes: Memory of rebalance triggers
-CREATE TABLE __DO_NOT_MANIPULATE__trigger_memory (d, c, m);
+-- Do not fiddle with it! I.e. if you do, don't expect any support.
+CREATE TABLE __INTERNAL_TRIGGER_STACK (id, d, c, m);
 
 -- Only for use of HTTP interface
 CREATE TABLE web_auth ( user_id primary key, password, grade not null, username, email );

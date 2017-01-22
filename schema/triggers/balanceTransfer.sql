@@ -1,5 +1,5 @@
-CREATE TRIGGER balanceTransfer
-     AFTER INSERT ON Transfer 
+CREATE TRIGGER linkTransferTightly
+    AFTER INSERT ON Transfer 
 BEGIN
 
   SELECT RAISE(FAIL, "It is not the debtor who is set to pay")
@@ -16,51 +16,58 @@ BEGIN
     HAVING count(d.billId) == 0
   ;
 
-  INSERT INTO __DO_NOT_MANIPULATE__trigger_memory
-     SELECT remainingDebt, remainingCredit, min(remainingDebt,remainingCredit) 
-     FROM (SELECT
-         (SELECT value - paid FROM Debit WHERE billId=NEW.billId) AS remainingDebt, 
-         (SELECT value - spent FROM Credit WHERE credId=NEW.credId) AS remainingCredit
-     )
+  INSERT INTO __INTERNAL_TRIGGER_STACK
+      SELECT NEW.ROWID,
+          CASE remainingDebt   WHEN 0 THEN RAISE(FAIL, "Debt settled") ELSE NEW.billId END,
+          CASE remainingCredit WHEN 0 THEN RAISE(FAIL, "Credit spent") ELSE NEW.credId END,
+          min(remainingDebt, remainingCredit) 
+      FROM (SELECT
+          (SELECT value - paid FROM Debit WHERE billId=NEW.billId) AS remainingDebt, 
+          (SELECT value - spent FROM Credit WHERE credId=NEW.credId) AS remainingCredit
+      )
   ;
 
+END;
+
+CREATE TRIGGER reflectTransfer
+    AFTER INSERT ON __INTERNAL_TRIGGER_STACK
+    WHEN NEW.id > 0
+BEGIN
+
   UPDATE Debit
-      SET paid = paid + CASE
-        WHEN (SELECT d FROM __DO_NOT_MANIPULATE__trigger_memory) <= 0
-          THEN RAISE(FAIL, "Debt settled")
-        ELSE
-          (SELECT m FROM __DO_NOT_MANIPULATE__trigger_memory)
-      END
-      WHERE billId=NEW.billId;
+      SET paid = paid + NEW.m
+      WHERE billId = NEW.d;
 
   UPDATE Credit
-      SET spent = spent + CASE
-        WHEN (SELECT c FROM __DO_NOT_MANIPULATE__trigger_memory) <= 0
-          THEN RAISE(FAIL, "Credit spent")
-        ELSE IFNULL(
-          (SELECT m FROM __DO_NOT_MANIPULATE__trigger_memory),
-          RAISE(FAIL,"Oops, lost __DO_NOT_MANIPULATE__trigger_memory record before increasing spent")
-        )
-      END
-      WHERE credId=NEW.credId;
+      SET spent = spent + NEW.m
+      WHERE credId = NEW.c;
 
   UPDATE Transfer
-      SET amount = (SELECT m FROM __DO_NOT_MANIPULATE__trigger_memory)
-      WHERE billId=NEW.billId AND credId=NEW.credId
-        ;
+      SET amount = ifnull(amount,0) + NEW.m
+      WHERE ROWID = NEW.id;
 
   UPDATE Credit
-      SET value = value + IFNULL(
-          (SELECT m FROM __DO_NOT_MANIPULATE__trigger_memory),
-          RAISE(FAIL, "Oops, lost __DO_NOT_MANIPULATE__trigger_memory record before increasing value")
-      )
+      SET value = value + NEW.m
       WHERE credId = (
           SELECT targetCredit
           FROM Debit
-          WHERE billId=NEW.billId
+          WHERE billId = NEW.d
       );
 
-  DELETE FROM __DO_NOT_MANIPULATE__trigger_memory;
+  DELETE FROM __INTERNAL_TRIGGER_STACK WHERE id=NEW.id;
+
+END;
+
+CREATE TRIGGER refreshTransfer
+    AFTER UPDATE OF amount ON Transfer
+BEGIN
+
+    DELETE FROM Transfer
+        WHERE ROWID = NEW.ROWID AND amount = 0;
+
+    UPDATE Transfer
+        SET timestamp=CURRENT_TIMESTAMP
+        WHERE ROWID=NEW.ROWID;   
 
 END;
 
