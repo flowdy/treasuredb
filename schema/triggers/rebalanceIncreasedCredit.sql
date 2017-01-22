@@ -7,7 +7,7 @@ CREATE TRIGGER rebalanceIncreasedCredit
 BEGIN
 
     INSERT INTO __INTERNAL_TRIGGER_STACK
-        SELECT t.ROWID, NEW.value, ca.difference,
+        SELECT t.ROWID, t.billId, t.credId,
             min(ca.difference, NEW.value - OLD.value)
         FROM Transfer t
           JOIN CurrentArrears ca ON t.billId = ca.billId
