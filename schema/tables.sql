@@ -60,7 +60,7 @@ CREATE TABLE Transfer (
 
 -- For internal purposes: Memory of rebalance triggers
 -- Do not fiddle with it! I.e. if you do, don't expect any support.
-CREATE TABLE __INTERNAL_TRIGGER_STACK (id, d, c, m);
+CREATE TABLE __INTERNAL_TRIGGER_STACK (id integer primary key, d, c, m);
 
 -- Only for use of HTTP interface
 CREATE TABLE web_auth ( user_id primary key, password, grade not null, username, email );
