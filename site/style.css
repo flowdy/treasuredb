@@ -34,7 +34,12 @@ table td.centered {
 
 table td.number {
     text-align: right;
-    font-family: monospace;
+    font-family: monospace, monospace; /* Hack to prevent browser default size reduction of monospace font */
+    font-size:1em;
+}
+
+table td.mark {
+    background-color:rgba(255,0,0,0.1);
 }
 
 a.transfer-btn {

@@ -18,7 +18,10 @@ sub list {
         return;
     }
 
-    $self->stash( debits => $account->debits_rs );
+    my $rs = $account->search_related(
+        debits => {}, { order_by => { -desc => [qw/date/] }}
+    );
+    $self->stash( debits => $rs );
 
     return;
 
@@ -29,17 +32,36 @@ sub upsert {
     
     my $db = $self->app->db;
     my $id = $self->stash("id");
-    my $account = $self->stash("account");
+    my @FIELDS = qw/billId date purpose value targetCredit/;
+    my $debtor = $self->stash("account") // $self->param("debtor");
+    if ( $self->req->method eq 'POST' && $debtor =~ s{^@}{} ) {
+
+        my $group_members = $db->resultset('Account')->search({
+            type => $debtor
+        });
+
+        while ( my $m = $group_members->next ) {
+            my %props = map { $_ => $self->param($_) } @FIELDS;
+            for ( $props{billId} ) {
+                 s{\%u}{ $m->ID }e or $_ .= "-" . $m->ID;
+            }
+            $m->debits->create( \%props );
+        }
+        
+        $self->redirect_to('home');
+        return;
+    }
+
     my $method = $id ? 'find_or_new' : 'new';
     my $debit = $db->resultset("Debit")->$method(
-        { $id ? (billId => $id) : (), debtor => $account }
+        { $id ? (billId => $id) : (), debtor => $debtor }
     );
 
     $self->stash( debit => $debit );
 
     if ( $self->req->method eq 'GET' ) {
         my $targets
-          = $db->resultset("Credit")->search({ account => { '!=' => $account } },
+          = $db->resultset("Credit")->search({ account => { '!=' => $debtor } },
                 { join => 'income',
                   '+select' => [ { count => 'income.targetCredit', -as => 'targetted_by' } ],
                   group_by => ['income.targetCredit'], 
@@ -52,7 +74,7 @@ sub upsert {
         return;
     }
 
-    for my $field ( qw/billId debtor date purpose value targetCredit/ ) {
+    for my $field ( @FIELDS ) {
         my $value = $self->param($field);
         $debit->$field($value);
     }

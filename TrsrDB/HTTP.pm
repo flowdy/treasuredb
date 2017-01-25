@@ -72,15 +72,17 @@ sub startup {
 
   my $admin = $auth->under(sub { shift->stash('grade') > 1 });
   $admin->any('/admin')->to('admin#dash');
+  $admin->any( [qw/GET POST/] => '/account/:account' => { account => undef })
+      ->to('account#upsert');
   $admin->post('/:account/in')->to('credit#upsert');
   $admin->post('/:account/out')->to('debit#upsert');
   $admin->get('/:account/credits')->to('credit#list');
   $admin->get('/:account/debits')->to('debit#list');
   $admin->post('/:account/transfer')->to('account#transfer');
   $admin->any( [qw/GET POST PATCH/] => '/credit/:id' )->to('credit#upsert');
-  $admin->post('/credit')->to('credit#upsert');
+  $admin->any( [qw/GET POST/] => '/credit')->to('credit#upsert');
   $admin->any( [qw/GET POST PATCH/] => '/debit/*id' )->to('debit#upsert');
-  $admin->post('/debit')->to('debit#upsert');
+  $admin->any( [qw/GET POST/] => '/debit')->to('debit#upsert');
   $admin->get('/:action')->to(controller => 'admin');
 
   $auth->get('/')->to('account#list')->name('home');

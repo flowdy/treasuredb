@@ -2,7 +2,10 @@
 
 <table>
 <tr><th>Date</th><th>Value</th><th>Purpose</th></tr>
+% my $total;
 % while ( my $record = $report->next ) {
+% $total += $record->value;
 <tr><td><%= $record->date %></td><td class="number"><%== money $record->value %></td><td><%== nl2br $record->purpose %></td></tr>
 % } 
+<tr><td style="text-align:right;">In total:</td><td class="number"><%== money $total %></td></tr>
 </table>

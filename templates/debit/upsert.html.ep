@@ -26,7 +26,7 @@ oops
 %   my $cmpacc = $targets->[0][1];
 %   my $target = $debit->targetCredit // '';
 <select id="targetCredit" title="<%= $targets_count %>" name="targetCredit">
-    <option value="">-- Please select (mandatory) --</option>
+    <option value="">-- Please select (unless outgoing payment) --</option>
     <optgroup label="<%= $cmpacc %>">
 % for my $tc ( @$targets ) {
 %   my $newacc = $tc->[1];
@@ -43,7 +43,8 @@ oops
 </select>
 % end
 % $r{debtor} = begin
-    <input id="debtor" name="debtor" value="<%= $debit->debtor %>">
+% my $g = param 'group';
+    <input id="debtor" name="debtor" value="<%= $g ? "\@$g" : $debit->debtor %>">
 % end
 
 <dl class="upsert">

@@ -2,7 +2,11 @@
 
 <table>
 <tr><th>Date</th><th>Purpose</th><th>Account</th><th>Debit</th><th>Credit</th></tr>
+% my ($total_credit, $total_debit);
 % while ( my $record = $records->next ) {
-<tr><td><%= $record->date %></td><td><%= $record->purpose %></td><td><%= $record->account %></td><td><%= $record->debit %></td><td><%= $record->credit %></td></tr>
+%     $total_credit += $record->credit;
+%     $total_debit  += $record->debit;
+<tr><td><%= $record->date %></td><td><%= $record->purpose %></td><td><%= $record->account %></td><td class="number"><%== money $record->debit %></td><td class="number"><%== money $record->credit %></td></tr>
 % } 
+<tr><td colspan="3" style="text-align:right;">Current balance:</td><td class="number"><%== $total_debit ? money $total_debit : '' %></td><td class="number"><%== $total_credit ? money $total_credit : '' %></td>
 </table>

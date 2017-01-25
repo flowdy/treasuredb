@@ -18,7 +18,10 @@ sub list {
         return;
     }
 
-    $self->stash( credits => $account->credits_rs );
+    my $rs = $account->search_related(
+        credits => {}, { order_by => { -desc => [qw/date/] } }
+    );
+    $self->stash( credits => $rs );
 
     return;
 
