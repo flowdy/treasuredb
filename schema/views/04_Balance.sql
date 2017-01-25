@@ -36,12 +36,13 @@ CREATE VIEW Balance AS
          SELECT d.debtor     AS account,
                 max(d.date)  AS until
          FROM Debit d
-             LEFT OUTER JOIN CurrentArrears ca ON d.debtor = ca.debtor
-         GROUP BY d.debtor, ca.debtor
-         HAVING COUNT(
-             -- Restricts the counting to the settled debts:
-             CASE d.value WHEN d.paid THEN 1 ELSE NULL END
-           ) -- Considers that there might be no current arrears:
-           AND d.date <= IFNULL( min(ca.date), '9999-99-99' )
+         LEFT OUTER JOIN (
+             SELECT debtor, min(date) uneven_from
+             FROM CurrentArrears
+             GROUP BY debtor
+         ) AS ca ON d.debtor=ca.debtor
+         WHERE d.date < IFNULL( ca.uneven_from, '9999-99-99' )
+         GROUP BY d.debtor
      )                          AS even ON Account.ID=even.account
   ;
+
