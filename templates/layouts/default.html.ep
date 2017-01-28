@@ -17,6 +17,33 @@
 % }
 <%= content %>
 
-<p style="text-align:center;"><a href="<%= url_for "home" %>">Back home – Account List</p>
-</body>
-</html>
+<p id="bottommenu"><a href="<%= url_for "home" %>">Overview</a>
+% if ( my $links = stash 'links' ) {
+%    while ( my ($link, $text) = splice @$links, 0, 2 ) {
+| <a href="<%= url_for $link %>"><%= $text %></a>
+%    }
+% }
+% my $help = stash 'help';
+% if ( defined $help ) {
+| <a href="#help">Help</a>
+% }
+% my $sql = sql_trace;
+% if ( defined $$sql ) {
+| <a href="#sql">SQL</a>
+% }
+</p>
+% if ( defined $help ) {
+<div class="targettable" id="help">
+%== $help->()
+</div>
+% }
+% if ( defined $sql ) {
+<div class="targettable" id="sql">
+<p>In case you are interested, this is what is executed in the database in order to process your request and to render this page. All essential logic and consistency checking is done on database level via triggers and views, so you could execute these SQL statements e.g. in the console and would get the same results. Note that, if any POST requests redirected here, SQL commands of those come first:</p>
+<textarea rows="5" style="width:100%;border:1px inset lightgrey;" readonly="readonly">
+%== $$sql
+</textarea></div>
+% }
+
+<p id="footer">Copyright 2016 Florian L. Heß | Treasure DB licensed under General Public License, version 3 | <a href="https://github.com/flowdy/treasuredb">Fork me on GitHub</a></p>
+</body></html>

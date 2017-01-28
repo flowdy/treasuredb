@@ -7,11 +7,22 @@ use Mojolicious::Sessions;
 use Mojo::Base 'Mojolicious';
 use POSIX qw(strftime);
 
-has db => sub {
-    my $db;
-    eval q{use TrsrDB \$db} or $@ && die $@;
-    return $db;
-};
+{ my $sql_trace;
+  open my $dfh, '>', \$sql_trace;
+  sub get_trace () {
+      my $t = $sql_trace;
+      $sql_trace = q{};
+      seek $dfh, 0, 0;
+      return \$t;
+  }
+  has db => sub {
+      my $db;
+      eval q{use TrsrDB \$db} or $@ && die $@;
+      $db->storage->debugfh($dfh);
+      return $db;
+  };
+}
+
 
 # This method will run once at server start
 sub startup {
@@ -43,6 +54,16 @@ sub startup {
       pop =~ s{\n}{<br>}grms;
   });
 
+  if ( $ENV{DBIC_TRACE} ) {
+      $self->helper(sql_trace => \&get_trace);
+  }
+  else {
+    $self->helper(sql_trace => sub {
+        return "No SQL trace shown here, because environment variable "
+             . "DBIC_TRACE is not set."
+    });
+  }
+
   if ( my $l = $ENV{LOG} ) {
       use Mojo::Log;
       open my $fh, '>', $l or die "Could not open logfile $l to write: $!";
@@ -63,21 +84,25 @@ sub startup {
 
   $auth->get( '/logout' )->to("user#logout");
 
-  my $check = $auth->under(sub { shift->stash('grade') })->get('/');
+  my $check = $auth->under(sub {
+      my $c = shift;
+      return $c->stash('grade') || undef;
+  })->get('/');
   $check->get('/bankStatement' => sub {
       my $c = shift;
       $c->stash( records => $c->app->db->resultset("ReconstructedBankStatement") );
       $c->render('bankStatement');
   });
 
-  my $admin = $auth->under(sub { shift->stash('grade') > 1 });
+  my $admin = $auth->under(sub {
+      my $c = shift;
+      return $c->stash('grade') > 1 || undef;
+  });
   $admin->any('/admin')->to('admin#dash');
   $admin->any( [qw/GET POST/] => '/account/:account' => { account => undef })
       ->to('account#upsert');
-  $admin->post('/:account/in')->to('credit#upsert');
-  $admin->post('/:account/out')->to('debit#upsert');
-  $admin->get('/:account/credits')->to('credit#list');
-  $admin->get('/:account/debits')->to('debit#list');
+  $admin->any( [qw/GET POST/] => '/:account/in')->to('credit#upsert');
+  $admin->any( [qw/GET POST/] => '/:account/out')->to('debit#upsert');
   $admin->post('/:account/transfer')->to('account#transfer');
   $admin->any( [qw/GET POST PATCH/] => '/credit/:id' )->to('credit#upsert');
   $admin->any( [qw/GET POST/] => '/credit')->to('credit#upsert');
@@ -90,6 +115,8 @@ sub startup {
   my $account = $auth->get('/:account')->under(sub {
       my $c = shift;
 
+      return 1 if $c->stash('grade');
+
       my $account = $c->stash('account');
       if ( my $acc = $c->app->db->resultset('Account')->find($account) ) {
           $c->stash( account => $acc );
@@ -100,13 +127,20 @@ sub startup {
           return;
       }
 
-      return $account->type ? $c->stash('grade') : 1;
+      return 1 if !$account->type;
+
+      return $account->ID eq $c->stash("user")->user_id || undef;
 
   });
-  $account->get('/in')->to("credit#upsert");
-  $account->get('/out')->to("debit#upsert");
+  $account->get('/credits')->to("credit#list");
+  $account->get('/debits')->to("debit#list");
   $account->get('/:action')->to('account#');
 
+  $r->any('/*whatever' => {whatever => ''} => sub {
+      my $c        = shift;
+      my $whatever = $c->param('whatever');
+      $c->render(text => "/$whatever did not match.", status => 404);
+  });
 }
 
 my $started_time;

@@ -13,8 +13,16 @@ sub import {
     my ($class, $dbh_ref, $filename) = @_;
     return if @_ == 1;
     croak "use TrsrDB \$your_db_handle missing" if !defined $dbh_ref;
+    my $filename //= $ENV{TRSRDB_SQLITE_FILE}
+        // croak "No database to open: TRSRDB_SQLITE_FILE environment variable not set, "
+               . "and no filename passed to ".__PACKAGE__."::import() / use";
+    if ( !(-f $filename && -r $filename) ) {
+        croak "Cannot read database file $filename";
+    }
+
     $$dbh_ref = $class->connect(
-        "DBI:SQLite:" . ($filename // $ENV{TRSRDB_SQLITE_FILE} // ":memory:"),
+        "DBI:SQLite:" . ($filename // $ENV{TRSRDB_SQLITE_FILE}
+            // die "No database to open: TRSRDB_SQLITE_FILE environment variable not set\n"),
         "", "", {
            sqlite_unicode => 1,
            on_connect_call => 'use_foreign_keys',

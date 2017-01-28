@@ -3,6 +3,7 @@ use strict;
 package TrsrDB::HTTP::Credit;
 use Mojo::Base 'Mojolicious::Controller';
 use Carp qw(croak);
+use POSIX qw(strftime);
 
 sub list {
     my $self = shift;
@@ -33,9 +34,11 @@ sub upsert {
     my $db = $self->app->db;
     my $id = $self->stash("id");
     my $method = $id ? 'find_or_new' : 'new';
-    my $credit = $db->resultset("Credit")->$method(
-        { $id ? (credId => $id) : (), account => $self->stash("account") }
-    );
+    my $credit = $db->resultset("Credit")->$method({
+        $id ? (credId => $id) : (),
+        account => $self->stash("account"),
+        date => strftime("%Y-%m-%d", localtime)
+    });
     $self->stash( credit => $credit );
 
     if ( $self->req->method eq 'GET' ) {

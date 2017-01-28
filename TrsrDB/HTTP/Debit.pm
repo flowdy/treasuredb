@@ -3,6 +3,7 @@ use strict;
 package TrsrDB::HTTP::Debit;
 use Mojo::Base 'Mojolicious::Controller';
 use Carp qw(croak);
+use POSIX qw(strftime);
 
 sub list {
     my $self = shift;
@@ -42,6 +43,7 @@ sub upsert {
 
         while ( my $m = $group_members->next ) {
             my %props = map { $_ => $self->param($_) } @FIELDS;
+            $props{targetCredit} ||= undef;
             for ( $props{billId} ) {
                  s{\%u}{ $m->ID }e or $_ .= "-" . $m->ID;
             }
@@ -53,9 +55,11 @@ sub upsert {
     }
 
     my $method = $id ? 'find_or_new' : 'new';
-    my $debit = $db->resultset("Debit")->$method(
-        { $id ? (billId => $id) : (), debtor => $debtor }
-    );
+    my $debit = $db->resultset("Debit")->$method({
+        $id ? (billId => $id) : (),
+        debtor => $debtor,
+        date => strftime("%Y-%m-%d", localtime)
+    });
 
     $self->stash( debit => $debit );
 
@@ -76,6 +80,7 @@ sub upsert {
 
     for my $field ( @FIELDS ) {
         my $value = $self->param($field);
+        $value = undef if !length $value;
         $debit->$field($value);
     }
     $debit->update_or_insert();
@@ -89,7 +94,15 @@ sub upsert {
 
     my $to_pay_with = $self->every_param("payWith");
     if ( @$to_pay_with ) {
-        $db->make_transfers( $to_pay_with => $self->param("billId") );
+        my $billId = $self->param("billId");
+        $db->make_transfers( $to_pay_with => $billId );
+        for my $param ( grep { /^note\[/ } @{ $self->req->params->names } ) {
+            my $note = $self->param($param) || next;
+            s{^note\[}{} && s{\]$}{} for $param;
+            $db->resultset("Transfer")->find({
+                billId => $self->param("billId"), credId => $param
+            })->update({ note => $note });
+        }    
     }                  
 
     $self->redirect_to('home');

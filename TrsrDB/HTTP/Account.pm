@@ -8,9 +8,14 @@ sub list {
     my $self = shift;
 
     my $accounts = $self->app->db->resultset("Account");
-
-    my %args = $self->stash("user")->grade ? () : ( type => undef );
-    $accounts = $accounts->search(\%args, { order_by => { -asc => [qw/type ID/] } });
+    my $user = $self->stash("user");
+    my %args = $user->grade                      ? ()
+             : $accounts->find( $user->user_id ) ? ( 'me.ID' => $user->user_id )
+             :                                     ( type => q{} );
+    $accounts = $accounts->search(\%args, {
+        order_by => { -asc => [qw/type balance.even_until me.ID/] },
+        prefetch => 'balance'
+    });
 
     $self->stash( accounts => $accounts );
 

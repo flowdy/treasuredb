@@ -7,7 +7,7 @@
 % my $inter_header = begin
 % my $group = shift;
 <tr><th colspan="11"><%= $group || 'Club management accounts' %></th>
-<th colspan="2"><a href="/debit?group=<%= $group %>">Charge'm all</a></th></tr>
+<th colspan="2"><a href="/debit?group=<%= $group %>"><img class="icon" src="/add-debit.svg" alt="Charge">all</a></th></tr>
 % end
 % while ( my $account = $accounts->next ) {
 % my $bal = $account->balance;
@@ -18,24 +18,26 @@
 % }
 % my $u = $account->ID;
 <tr><th><a href="/account/<%= $u %>"><%= $u %></a></th>
-   <td class="even_until"><%= $bal->even_until // "never" %></td><td class="number"><%== money $bal->arrears %></td><td><a href="<%= $u %>/debits">list</td><td><a href="<%= $u %>/out">Charge</a></td>
+   <td class="even_until"><%= $bal->even_until // "never" %></td><td class="number"><%== money $bal->arrears %></td><td><a href="<%= $u %>/debits"><img class="icon" alt="List" src="/list.svg" alt="List"></td><td><a title="Add a debit" href="<%= $u %>/out"><img class="icon" src="/add-debit.svg" alt="Charge"></a></td>
 <td class="centered">
 % my $which = ($bal->arrears && 1) + ($bal->available && 1);
 % if ( $which == 2 ) {
-   <a class="transfer-btn" href="<%= $u %>/transfer">C&hArr;D!</a>
+   › <a href="<%= $u %>/transfer"><img class="icon" src="/transfer.svg"></a> ‹
 % }
 % elsif ( $which ) {
-   <span style="background-color:rgba(224,224,0,0.4);">&nbsp;N/A&nbsp;</span>
+   <%== $bal->arrears ? q{›} : q{&nbsp;} %>
+   <img class="icon" src="/wait.svg" style="cursor:not-allowed;">
+   <%== $bal->available ? q{‹} : q{&nbsp;} %>
 % }
 % else {
-   <span  style="background-color:rgba(0,224,0,0.4);">&nbsp;N/A&nbsp;</span>
+   <img class="icon" src="/even.svg" style="cursor:not-allowed;">
 % }
-   </td><td class="number"><%== money $bal->available %></td><td><a href="<%= $u %>/credits">list</a></td><td><a href="<%= $u %>/in">Credit</a></td><td class="number"><%== money $bal->earned %></td><td class="number"><%== money $bal->promised %></td><td><a href="<%= $u %>/history">History</a></td><td><a href="<%= $u %>/report">Report</a></td></tr>
+   </td><td class="number"><%== money $bal->available %></td><td><a href="<%= $u %>/credits"><img class="icon" alt="List" src="/list.svg" alt="List"></a></td><td><a title="Add a credit" href="<%= $u %>/in"><img class="icon" src="/add-credit.svg" alt="Credit"></a></td><td class="number"><%== money $bal->earned %></td><td class="number"><%== money $bal->promised %></td><td><a href="<%= $u %>/history">History</a></td><td><a href="<%= $u %>/report">Report</a></td></tr>
 % } # while
 </table>
 
-<p style="text-align:center;"><a href="/account/">Create account</a> &sdot; <a href="/bankStatement">Reconstructed bank statement</a></p>
-<div class="help">
+% stash links => [ '/account' => "Create account", '/bankStatement' => "Reconstructed bank statement" ];
+% my $help = begin
 <h2>Column explanation</h2>
 <dl>
 <dt>Even till:</dt>
@@ -51,4 +53,5 @@
 <dt>Promised:</dt>
 <dd><p>Unpaid or not fully paid debits targetting credits of that account.</p></dd>
 </dl>
-</div>
+% end
+% stash help => $help;

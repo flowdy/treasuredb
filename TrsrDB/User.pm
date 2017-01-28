@@ -25,7 +25,7 @@ __PACKAGE__->set_primary_key('user_id');
 sub salted_password {
     my ($self, $password) = @_;
     if ( exists $_[1] ) {
-        my $random_string = _randomstring(8);
+        my $random_string = randomstring(8);
         return $self->password(
             $random_string."//".hmac_sha256_hex($password, $random_string)
         );
@@ -55,7 +55,7 @@ sub sqlt_deploy_hook {
 }
 
 my @chars = ( 0..9, "a".."z", "A".."Z" );
-sub _randomstring {
+sub randomstring {
     my ($length) = @_;
     return join q{}, map { $chars[ int rand(62) ] } 1 .. $length;
 }

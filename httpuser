@@ -1,0 +1,47 @@
+#!/usr/bin/env perl
+use strict;
+
+my $db;
+use TrsrDB \$db;
+
+use Getopt::Long;
+
+my %OPTS;
+GetOptions( \%OPTS, 'add|a', 'reset|r', 'grade|g:i', 'email|m:s', 'username|name|n:s' );
+
+my $user = shift;
+if ( !$user ) {
+    die 'No user_id given. Usage: httpuser [-a|-r] $USERNAME [-g 0|1|2] [-m $MAILADDR] [-n $FULL_NAME]', "\n";
+}
+
+if ( $OPTS{add} ) {
+    die "--add/-a and --reset/-r (reset password of existing account) contradict" if $OPTS{reset};
+    $user = $db->resultset("User")->create({ user_id => $user, grade => delete $OPTS{grade} });
+}
+else {
+    $user = $db->resultset("User")->find($user)
+         // die "No user $user found";
+}
+
+if ( delete $OPTS{add} || delete $OPTS{reset} ) {
+    my $random_string = TrsrDB::User::randomstring(50);
+    print "Load or send someone following link:\n",
+          "------------------------------------\n",
+          "<FQDN>/login?token=".$random_string."\n\n";
+    $user->password($random_string);
+}
+
+$user->update(\%OPTS);
+
+print "User data:\n",
+      "----------\n",
+      "ID:    ", $user->user_id, "\n",
+      "Grade: ", [
+                   "0 - can read main accounts, or his own only when its ID equals his",
+                   "1 - can read all accounts and bank statement, but cannot add or change data",
+                   "2 - can read and update the database"
+                 ]->[ $OPTS{grade} // $user->grade ]."\n" // die "Unsupported level: $OPTS{grade}",
+      "E-Mail: ", $OPTS{email} // $user->email // "(none)",
+      "Name:   ", $OPTS{username} // $user->username // "(none)"
+    ;
+

@@ -1,0 +1,35 @@
+% title $name ? "Account $name" : "Create account";
+
+% my %r;
+% $r{ID} = begin
+    <input id="ID" name="ID" value="<%= $account->ID %>">
+% end
+% $r{type} = begin
+    <input id="type" name="type" value="<%= $account->type %>"> (<%= join(", ", @$types) %> or a new?)
+% end
+% $r{altId} = begin
+    <input id="altId" name="altId" value="<%= $account->altId %>">
+% end
+% $r{IBAN} = begin
+    <input id="IBAN" name="IBAN" value="<%= $account->IBAN %>">
+% end
+
+<form method="post">
+
+<dl class="upsert">
+% for my $f ( $account->result_source->columns ) {
+% my $renderer = $r{$f} // do {
+%     my $value = $account->$f // next;
+%     begin
+    <%= $value  %>
+%     end
+% };
+<dt><label for="<%= $f %>"><%= $f %>: </label></dt>
+<dd><%= $renderer->() %></dd>
+% }
+</dl>
+
+<button type="submit">Submit</button>
+</form>
+
+

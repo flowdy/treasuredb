@@ -11,14 +11,17 @@ __PACKAGE__->add_column("purpose");
 __PACKAGE__->add_column("value" => { data_type => 'INTEGER' });
 __PACKAGE__->add_column("paid" => { data_type => 'INTEGER', default => 0 });
 __PACKAGE__->set_primary_key("billId");
-__PACKAGE__->add_column("targetCredit" => { data_type => 'INTEGER' });
+__PACKAGE__->add_column("targetCredit" => {
+    data_type => 'INTEGER',
+    is_nullable => 1
+});
 
 __PACKAGE__->belongs_to(
     account => 'TrsrDB::Account',
     { 'foreign.ID' => 'self.debtor' }
 );
 
-__PACKAGE__->might_have(
+__PACKAGE__->belongs_to(
     target => 'TrsrDB::Credit',
     { 'foreign.credId' => 'self.targetCredit' }
 );

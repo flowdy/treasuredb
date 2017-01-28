@@ -13,6 +13,14 @@ h1 {
     border-bottom: 5px double grey;
 }
 
+table {
+    border-collapse: collapse;
+}
+
+table td, table th {
+    border: 1px solid darkgrey;
+}
+
 table tr:nth-child(even) {
     background-color: #eee;
 }
@@ -67,4 +75,25 @@ select {
 .help {
     color: lightgrey;
     font-size: .8em;
+}
+
+img.icon {
+    vertical-align:middle;
+    height: 1.2em;
+}
+
+.targettable { display:none }
+.targettable:target { display: block; }
+
+#bottommenu {
+    font-size:smaller;
+    background-color: #eee;
+    border-top: 5px double grey;
+    text-align:center;
+}
+
+#footer {
+    font-size:smaller;
+    color: darkgrey;
+    text-align: center;
 }

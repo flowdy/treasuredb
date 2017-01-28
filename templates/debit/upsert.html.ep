@@ -90,12 +90,13 @@ oops
 %    if ( $credits->count() ) {
 <p>Check credits you want to <strong>pay this debit</strong> with.</p>
 <table>
-<tr><th>S</th><th>date</th><th>purpose</th><th>to spend</th></tr>
+<tr><th>S</th><th>date</th><th>purpose</th><th>to spend</th><th>note</th></tr>
 %        while ( my $d = $credits->next ) {
 <tr><td><input type="checkbox" name="payWith" value="<%= $d->credId %>"></td>
     <td><%= $d->date %></td>
     <td><%== nl2br $d->purpose %></td>
     <td><%== money $d->difference %></td>
+    <td><input type="text" name="note[<%= $d->credId %>]"></td>
 </tr>
 %        }
 </table>

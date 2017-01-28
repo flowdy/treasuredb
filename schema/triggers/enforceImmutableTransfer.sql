@@ -1,5 +1,5 @@
 CREATE TRIGGER enforceImmutableTransfer
-    BEFORE UPDATE ON Transfer
+    BEFORE UPDATE OF timestamp, credId, billId, amount ON Transfer -- Allow update of note
     WHEN OLD.amount IS NOT NULL
       AND NOT EXISTS (SELECT * FROM __INTERNAL_TRIGGER_STACK)
 BEGIN
