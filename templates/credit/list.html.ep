@@ -8,3 +8,5 @@
 <tr><td class="number"><a href="/credit/<%= $credit->credId %>"><%= $credit->credId %></a></td><td><%= $credit->date %></td><td><%== nl2br $credit->purpose %></td><td class="number"><%== money $credit->value %></td><td class="number <%= $credit->spent < $credit->value ? "mark" : "" %>"><%== money $credit->spent %></td></tr>
 % }
 </table>
+
+%= include 'filter-widget'

@@ -4,24 +4,25 @@ PRAGMA recursive_triggers = ON;
 -- To understand the sql below, see the schema.sql file.
 
 INSERT INTO Account VALUES ("Club", "eV", 1, NULL), ("john", "Member", 44, NULL), ("alex", "Member", 6, "DE1234567890123456");
+INSERT INTO Category ("label") VALUES ("Membership fees"), ("Service");
 
-INSERT INTO Credit VALUES (1, "Club", "2016-01-01", "Membership fees May 2016 until incl. April 2017", 0, 0),
-                         (2, "john", "2016-04-23", "Membership fee 2016f.", 7200, 0),
-                         (3, "alex", "2016-01-15", "Payment for Server Hosting 2016", 0, 0);
+INSERT INTO Credit VALUES (1, "Club", "2016-01-01", "Membership fees May 2016 until incl. April 2017", 1, 0, 0),
+                         (2, "john", "2016-04-23", "Membership fee 2016f.", 1, 7200, 0),
+                         (3, "alex", "2016-01-15", "Payment for Server Hosting 2016", 1, 0, 0);
 
-INSERT INTO Debit VALUES ("MB1605-john", "john", 1, "2016-05-01", "Membership fee May 2016", 600, 0),
-                        ("MB1606-john", "john", 1, "2016-05-01", "Membership fee June 2016", 600, 0),
-                        ("MB1607-john", "john", 1, "2016-05-01", "Membership fee July 2016", 600, 0),
-                        ("MB1608-john", "john", 1, "2016-05-01", "Membership fee August 2016", 600, 0),
-                        ("MB1609-john", "john", 1, "2016-05-01", "Membership fee September 2016", 600, 0),
-                        ("MB1610-john", "john", 1, "2016-05-01", "Membership fee October 2016", 600, 0),
-                        ("MB1611-john", "john", 1, "2016-05-01", "Membership fee November 2016", 600, 0),
-                        ("MB1612-john", "john", 1, "2016-05-01", "Membership fee December 2016", 600, 0),
-                        ("MB1701-john", "john", 1, "2016-05-01", "Membership fee January 2017", 600, 0),
-                        ("MB1702-john", "john", 1, "2016-05-01", "Membership fee February 2017", 600, 0),
-                        ("MB1703-john", "john", 1, "2016-05-01", "Membership fee March 2017", 600, 0),
-                        ("MB1704-john", "john", 1, "2016-05-01", "Membership fee April 2017", 600, 0),
-                        ("TWX2016/123", "Club", 3, "2016-01-15", "Server Hosting 2016", 23450, 0);
+INSERT INTO Debit VALUES ("MB1605-john", "john", 1, "2016-05-01", "Membership fee May 2016", 1, 600, 0),
+                        ("MB1606-john", "john", 1, "2016-05-01", "Membership fee June 2016", 1, 600, 0),
+                        ("MB1607-john", "john", 1, "2016-05-01", "Membership fee July 2016", 1, 600, 0),
+                        ("MB1608-john", "john", 1, "2016-05-01", "Membership fee August 2016", 1, 600, 0),
+                        ("MB1609-john", "john", 1, "2016-05-01", "Membership fee September 2016", 1, 600, 0),
+                        ("MB1610-john", "john", 1, "2016-05-01", "Membership fee October 2016", 1, 600, 0),
+                        ("MB1611-john", "john", 1, "2016-05-01", "Membership fee November 2016", 1, 600, 0),
+                        ("MB1612-john", "john", 1, "2016-05-01", "Membership fee December 2016", 1, 600, 0),
+                        ("MB1701-john", "john", 1, "2016-05-01", "Membership fee January 2017", 1, 600, 0),
+                        ("MB1702-john", "john", 1, "2016-05-01", "Membership fee February 2017", 1, 600, 0),
+                        ("MB1703-john", "john", 1, "2016-05-01", "Membership fee March 2017", 1, 600, 0),
+                        ("MB1704-john", "john", 1, "2016-05-01", "Membership fee April 2017", 1, 600, 0),
+                        ("TWX2016/123", "Club", 3, "2016-01-15", "Server Hosting 2016", 2, 23450, 0);
 
 .separator "	"
 SELECT "ID:	availbl	promise debt";

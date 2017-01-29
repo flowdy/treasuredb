@@ -4,7 +4,7 @@ package TrsrDB::History;
 use base qw/DBIx::Class::Core/;
 
 __PACKAGE__->table('History');
-__PACKAGE__->add_columns(qw/date purpose account credId credit debit contra billId note/);
+__PACKAGE__->add_columns(qw/date purpose category account credId credit debit contra billId note/);
 
 __PACKAGE__->belongs_to(
    account => 'TrsrDB::Account',

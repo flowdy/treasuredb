@@ -9,3 +9,5 @@
 <tr><td><a href="/debit/<%= $debit->billId %>"><%= $debit->billId %></a></td><td><%= $debit->date %></td><td><%== nl2br $debit->purpose %></td><td class="number"><%== money $debit->value %></td><td class="number <%= $debit->paid < $debit->value ? "mark" : "" %>"><%== money $debit->paid %><td><a href="/credit/<%= $tgt->credId %>"><%= $tgt->account->ID %></a></tr>
 % }
 </table>
+
+%= include 'filter-widget'

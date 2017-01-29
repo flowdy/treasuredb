@@ -58,10 +58,7 @@ sub startup {
       $self->helper(sql_trace => \&get_trace);
   }
   else {
-    $self->helper(sql_trace => sub {
-        return "No SQL trace shown here, because environment variable "
-             . "DBIC_TRACE is not set."
-    });
+    $self->helper(sql_trace => \&_get_trace_placeholder);
   }
 
   if ( my $l = $ENV{LOG} ) {
@@ -90,7 +87,9 @@ sub startup {
   })->get('/');
   $check->get('/bankStatement' => sub {
       my $c = shift;
-      $c->stash( records => $c->app->db->resultset("ReconstructedBankStatement") );
+      my $records = $c->app->db->resultset("ReconstructedBankStatement")
+                  ->search( process_table_filter_widget($c) );
+      $c->stash( records => $records );
       $c->render('bankStatement');
   });
 
@@ -299,6 +298,50 @@ sub render_online_help {
 
 }
 
+sub process_table_filter_widget {
+    my $c = shift;
+    my %query = $_[0] ? %{$_[0]} : ();
+    my %options = $_[1] ? %{$_[1]} : ();
+    $options{rows} //= $c->param("rows") // 100;
+
+    if ( my $category = $c->param('category') ) {
+        $query{category} = $category;
+    }
+
+    if ( my $purpose = $c->param('purpose') ) {
+        $query{purpose} //= { -like => "%$purpose%" };
+    }
+
+    my $until;
+    if ( $until = $c->param('until') ) {
+        $query{date} = { '<=' => $until };
+    }
+
+    if ( my $from = $c->param('from') ) {
+        if ( $until ) {
+            $query{date}{'>='} = $from;
+        }
+        elsif ( $from =~ m{ \A \d{4} (-\d\d)? }xms ) {
+            $query{date} = { -like => "$from%" };
+        }
+        else {
+            $query{date} = { '>=' => $from };
+        }
+    }
+
+    if ( my $page = $c->param("page") ) {
+        $options{page} = $page;
+    }
+
+    return \%query, \%options;
+
+}
+
+sub _get_trace_placeholder { \<<'EOF'
+In this area, the server can trace SQL commands executed to fulfill your request. If the admin wants that, they can run the server with environment variable DBIC_TRACE=1.
+All substantial logic of Treasure DB is done in the scope of the database itself. In consequence, you could do without this HTTP interface and input all SQL commands shown here directly in a general-purpose SQLite3 user interface. Thus you will get roughly the same results.
+EOF
+}
 1;
 
 __END__

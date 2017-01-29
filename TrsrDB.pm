@@ -6,7 +6,7 @@ use Carp qw/croak/;
 
 __PACKAGE__->load_classes(qw|
     Account Debit Credit Transfer CurrentArrears AvailableCredits
-    Balance Report ReconstructedBankStatement History User
+    Category Balance Report ReconstructedBankStatement History User
 |);
 
 sub import {

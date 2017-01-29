@@ -4,6 +4,7 @@ CREATE VIEW History AS
   -- internal transfers with account as source
   SELECT DATE(timestamp) AS date,
          d.purpose       AS purpose,
+         d.category      AS category,
          d.debtor        AS account,
          t.credId        AS credId,
          t.amount        AS debit,
@@ -17,6 +18,7 @@ CREATE VIEW History AS
   UNION
   SELECT DATE(timestamp) AS date,
          d.purpose       AS purpose,
+         d.category      AS category,
          c.account       AS account,
          d.targetCredit  AS credId,
          NULL            AS debit,

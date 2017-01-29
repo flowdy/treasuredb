@@ -20,7 +20,9 @@ sub list {
     }
 
     my $rs = $account->search_related(
-        credits => {}, { order_by => { -desc => [qw/date/] } }
+        credits => TrsrDB::HTTP::process_table_filter_widget(
+            $self, {}, { order_by => { -desc => [qw/date/] }}
+        )
     );
     $self->stash( credits => $rs );
 
@@ -39,14 +41,20 @@ sub upsert {
         account => $self->stash("account"),
         date => strftime("%Y-%m-%d", localtime)
     });
-    $self->stash( credit => $credit );
+    $self->stash(
+        credit => $credit,
+        categories => $db->resultset("Category")->search_rs({}, {
+            order_by => { -asc => [qw/ID/] }
+        })
+    );
 
     if ( $self->req->method eq 'GET' ) {
         return;
     }
 
-    for my $field ( qw/account date purpose value/ ) {
+    for my $field ( qw/account date purpose category value/ ) {
         my $value = $self->param($field);
+        $value = undef if !length $value;
         $credit->$field($value);
     }
     $credit->update_or_insert();

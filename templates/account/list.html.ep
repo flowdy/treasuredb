@@ -7,7 +7,7 @@
 % my $inter_header = begin
 % my $group = shift;
 <tr><th colspan="11"><%= $group || 'Club management accounts' %></th>
-<th colspan="2"><a href="/debit?group=<%= $group %>"><img class="icon" src="/add-debit.svg" alt="Charge">all</a></th></tr>
+<th colspan="2"><a href="/debit?group=<%= $group %>"><img class="icon" src="/add-debit.svg" alt="Charge"> all at once</a></th></tr>
 % end
 % while ( my $account = $accounts->next ) {
 % my $bal = $account->balance;

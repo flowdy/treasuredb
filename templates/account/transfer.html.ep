@@ -1,12 +1,12 @@
 % title 'Make transfers for ' . $account;
 
-<p>Check at least one item of each table that belong together.</p>
+<p>Check at least one item of both tables. Make sure they correspond in regard to their purposes. <em><strong>Caution:</strong> When you do not check any items in either table, this effectively is to check all in it!</em></p>
 
 <form method="post">
 
 <h2>Available credits</h2>
 
-<p>Check credits you want to <strong>spend for the arrear(s) below</strong> with.</p>
+<p>Check credits you want to <strong>spend for the arrear(s) below</strong>:</p>
 
 <table>
 <tr><th>?</th><th>date</th><th>purpose</th><th>to spend</th></tr>

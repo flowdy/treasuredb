@@ -20,7 +20,9 @@ sub list {
     }
 
     my $rs = $account->search_related(
-        debits => {}, { order_by => { -desc => [qw/date/] }}
+        debits => TrsrDB::HTTP::process_table_filter_widget(
+            $self, {}, { order_by => { -desc => [qw/date/] }}
+        )
     );
     $self->stash( debits => $rs );
 
@@ -33,7 +35,7 @@ sub upsert {
     
     my $db = $self->app->db;
     my $id = $self->stash("id");
-    my @FIELDS = qw/billId date purpose value targetCredit/;
+    my @FIELDS = qw/billId date purpose category value targetCredit/;
     my $debtor = $self->stash("account") // $self->param("debtor");
     if ( $self->req->method eq 'POST' && $debtor =~ s{^@}{} ) {
 
@@ -74,7 +76,14 @@ sub upsert {
                 }
             );
         my @targets = map { [ $_->credId, $_->account->ID, $_->purpose ] } $targets->all;
-        $self->stash( targets => \@targets, targets_count => $targets->count );
+        my $categories = $db->resultset("Category")->search_rs({}, {
+            order_by => { -asc => [qw/ID/] }
+        });
+        $self->stash(
+            categories => $categories,
+            targets => \@targets,
+            targets_count => $targets->count
+        );
         return;
     }
 

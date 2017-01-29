@@ -2,6 +2,7 @@ DROP VIEW IF EXISTS ReconstructedBankStatement;
 CREATE VIEW ReconstructedBankStatement AS
   SELECT c.date    AS date,
          c.purpose AS purpose,
+         c.category AS category,
          account,
          c.value   AS credit,
          NULL      AS debit
@@ -12,6 +13,7 @@ CREATE VIEW ReconstructedBankStatement AS
   UNION
   SELECT date,
          purpose,
+         category   AS category,
          debtor     AS account,
          NULL       AS credit,
          value      AS debit

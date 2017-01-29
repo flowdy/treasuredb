@@ -4,6 +4,6 @@ package TrsrDB::ReconstructedBankStatement;
 use base qw/DBIx::Class::Core/;
 
 __PACKAGE__->table('ReconstructedBankStatement');
-__PACKAGE__->add_columns(qw/date purpose account credit debit/);
+__PACKAGE__->add_columns(qw/date purpose category account credit debit/);
 
 1;

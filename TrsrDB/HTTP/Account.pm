@@ -59,9 +59,17 @@ sub upsert {
 
 sub history {
     my $self = shift;
-    my $history = $self->app->db->resultset("History")->search({
-        account => $self->stash("account")
-    }, { order_by => { -desc => [qw/date/] } });
+    my %query = ( account => $self->stash("account") );
+    if ( my $p = $self->param("purpose") ) {
+        # ...
+    }
+    my $history = $self->app->db->resultset("History")->search(
+        TrsrDB::HTTP::process_table_filter_widget(
+            $self, \%query,
+            { order_by => { -desc => [qw/date/] } }
+        )
+    );
+
     $self->stash( history => $history );
 }
 

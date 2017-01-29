@@ -14,3 +14,5 @@
 </td><td class="number"><%== money $hr->debit %></td><td class="number"><%== money $hr->credit %></td><td><%= $hr->note %></td></tr>
 % }
 </table>
+
+%= include 'filter-widget'

@@ -5,6 +5,12 @@ CREATE TABLE Account (
   IBAN -- target account for returned payments (set '' to enable
        -- outgoing bank transfers to commercial partners from that account).
 );
+
+CREATE TABLE Category (
+  ID INTEGER PRIMARY KEY,
+  label
+);
+
 CREATE TABLE Debit (
   billId PRIMARY KEY NOT NULL,
   debtor NOT NULL, -- Account charged
@@ -13,10 +19,12 @@ CREATE TABLE Debit (
                    -- NULL when debit is a bank transfer from the club account
   date DATE NOT NULL,
   purpose NOT NULL, -- description of receipt
+  category,
   value INTEGER NOT NULL, -- Euro-Cent
   paid INTEGER DEFAULT 0, -- Euro-Cent, set and changed automatically (Cache)
   FOREIGN KEY (debtor) REFERENCES Account(ID),
   FOREIGN KEY (targetCredit) REFERENCES Credit(credId),
+  FOREIGN KEY (category) REFERENCES Category(ID),
   CHECK ( abs(cast(value as integer)) == value
       AND abs(cast( paid as integer)) == paid
       AND value > 0 AND value >= paid
@@ -28,11 +36,13 @@ CREATE TABLE Credit (
   account NOT NULL, -- Account des Begünstigten
   date DATE NOT NULL,
   purpose NOT NULL, -- as originally indicated in statement of bank account
+  category,
   value INTEGER NOT NULL, -- Euro-Cent. Caution, two distinct cases need to be considered:
                          --  Either deposit by bank transfer (>0) or target of internal payments (=0)
   spent INTEGER DEFAULT 0, -- Euro-Cent, set and changed automatically (Cache)
                            -- for later traceability, necessary when revoking transfers
   FOREIGN KEY (account) REFERENCES Account(ID),
+  FOREIGN KEY (category) REFERENCES Category(ID),
   CHECK ( abs(cast(value as integer)) == value
       AND abs(cast(spent as integer)) == spent
       AND value >= spent

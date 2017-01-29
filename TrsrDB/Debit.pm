@@ -8,6 +8,7 @@ __PACKAGE__->add_column("billId");
 __PACKAGE__->add_column("debtor");
 __PACKAGE__->add_column("date" => { data_type => 'DATE' });
 __PACKAGE__->add_column("purpose");
+__PACKAGE__->add_column("category", { is_nullable => 1 });
 __PACKAGE__->add_column("value" => { data_type => 'INTEGER' });
 __PACKAGE__->add_column("paid" => { data_type => 'INTEGER', default => 0 });
 __PACKAGE__->set_primary_key("billId");
@@ -24,6 +25,11 @@ __PACKAGE__->belongs_to(
 __PACKAGE__->belongs_to(
     target => 'TrsrDB::Credit',
     { 'foreign.credId' => 'self.targetCredit' }
+);
+
+__PACKAGE__->belongs_to(
+    category_row => 'TrsrDB::Category',
+    { 'foreign.ID' => 'self.category' }
 );
 
 __PACKAGE__->has_many(

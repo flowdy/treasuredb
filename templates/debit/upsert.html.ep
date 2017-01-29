@@ -14,6 +14,17 @@
 % $r{purpose} = begin
     <input id="purpose" name="purpose" style="width:100%" value="<%= $debit->purpose %>">
 % end
+% $r{category} = begin
+%    my $category = $debit->category // '';
+<select id="category" name="category">
+    <option value="">-- Please select --</option>
+% while ( my $c = $categories->next ) {
+        <option value="<%= $c->ID %>" <%== $category == $c->ID ? 'selected="selected"' :'' %>>
+            <%= $c->label %>
+        </option>
+% }
+</select>
+% end
 % $r{value} = begin
     <input id="value" name="value" value="<%= $debit->value %>"> Cent
 % end
@@ -42,10 +53,12 @@ oops
     </optgroup>
 </select>
 % end
+% if ( !stash 'account' ) {
 % $r{debtor} = begin
 % my $g = param 'group';
     <input id="debtor" name="debtor" value="<%= $g ? "\@$g" : $debit->debtor %>">
 % end
+% }
 
 <dl class="upsert">
 % for my $f ( $debit->result_source->columns ) {
