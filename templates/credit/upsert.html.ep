@@ -43,6 +43,7 @@
 </dl>
 
 
+% my %paid_debits;
 % if ( $credit->in_storage ) {
 %    my $o = $credit->outgoings;
 %    if ( $o->count() ) {
@@ -52,11 +53,12 @@
 <tr><th>R</th><th>timestamp</th><th>paid</th><th>value</th><th>note</th></tr>
 %        while ( my $t = $o->next ) {
 %            my $d = $t->debit; 
+%            $paid_debits{ $t->billId } = 1;
 <tr><td><input type="checkbox" name="revoke" value="<%= $t->billId %>"></td>
     <td><%= $t->timestamp %></td>
     <td><%== nl2br $d->purpose %></td>
     <td class="number"><%== money $t->amount %></td>
-    <td><%= $t->note %></td>
+    <td><input type="text" name="note[<%= $t->billId %>]" value="<%= $t->note %>"></td>
 </tr>
 %        }
 </table>
@@ -70,15 +72,18 @@
 % if ( $account //= $credit->account ) {
 <h2>Spend for arrears</h2>
 %    my $arrears = ( ref $account ? $account : app->db->resultset("Account")->find($account) )->current_arrears;
-%    if ( $arrears->count() ) {
+%    if ( $arrears->first() ) {
+<p><%= $credit->value == $credit->spent ? "The credit is already spent. Unless you revoke any outgoings above, there is no point in checking" : "Check" %> <%= %paid_debits ? "other" : "" %> debits you want to <strong>spend this credit</strong> for:</p>
 <p>Check arrears you want to <strong>use this credit</strong> for.</p>
 <table>
 <tr><th>S</th><th>date</th><th>purpose</th><th>to pay</th></tr>
 %        while ( my $d = $arrears->next ) {
+%            next if $paid_debits{ $d->billId };
 <tr><td><input type="checkbox" name="spendFor" value="<%= $d->billId %>"></td>
     <td><%= $d->date %></td>
     <td><%== nl2br $d->purpose %></td>
     <td class="number"><%== money $d->difference %></td>
+    <td><input type="text" name="note[<%= $d->billId %>]"></td>
 </tr>
 %        }
 </table>

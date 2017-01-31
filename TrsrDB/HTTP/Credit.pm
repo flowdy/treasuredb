@@ -71,6 +71,14 @@ sub upsert {
         $db->make_transfers( $self->param("billId") => $to_spend_for);
     }                  
 
+    for my $param ( grep { /^note\[/ } @{ $self->req->params->names } ) {
+        my $note = $self->param($param) || next;
+        s{^note\[}{} && s{\]$}{} for $param;
+        $credit->search_related(
+            outgoings => { billId => $param }
+        )->update({ note => $note });
+    }
+
     $self->redirect_to('home');
 
 

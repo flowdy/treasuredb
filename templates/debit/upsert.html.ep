@@ -73,6 +73,7 @@ oops
 % }
 </dl>
 
+% my %used_credits;
 % if ( $debit->in_storage ) {
 %    my $i = $debit->incomings;
 %    if ( $i->count() ) {
@@ -82,11 +83,12 @@ oops
 <tr><th>R</th><th>timestamp</th><th>paid</th><th>value</th><th>note</th></tr>
 %        while ( my $t = $i->next ) {
 %            my $c = $t->credit; 
+%            $used_credits{ $t->credId } = 1;
 <tr><td><input type="checkbox" name="revoke" value="<%= $t->credId %>"></td>
     <td><%= $t->timestamp %></td>
     <td><%== nl2br $c->purpose %></td>
-    <td><%== money $t->amount %></td>
-    <td><%= $t->note %></td>
+    <td class="number"><%== money $t->amount %></td>
+    <td><input type="text" name="note[<%= $t->credId %>]" value="<%= $t->note %>"></td>
 </tr>
 %        }
 </table>
@@ -100,16 +102,17 @@ oops
 % if ( $account ||= $debit->debtor ) {
 <h2>Pay with credits</h2>
 %    my $credits = app->db->resultset("Account")->find($account)->available_credits;
-%    if ( $credits->count() ) {
-<p>Check credits you want to <strong>pay this debit</strong> with.</p>
+%    if ( $credits->first() ) {
+<p><%= $debit->value == $debit->value ? "The debt is already settled. Unless you revoke any incomings above, there is no point in checking" : "Check" %> <%= %used_credits ? "other" : "" %> credits you want to <strong>pay this debit</strong> with:</p>
 <table>
 <tr><th>S</th><th>date</th><th>purpose</th><th>to spend</th><th>note</th></tr>
-%        while ( my $d = $credits->next ) {
-<tr><td><input type="checkbox" name="payWith" value="<%= $d->credId %>"></td>
-    <td><%= $d->date %></td>
-    <td><%== nl2br $d->purpose %></td>
-    <td><%== money $d->difference %></td>
-    <td><input type="text" name="note[<%= $d->credId %>]"></td>
+%        while ( my $c = $credits->next ) {
+%            next if $used_credits{ $c->credId };
+<tr><td><input type="checkbox" name="payWith" value="<%= $c->credId %>"></td>
+    <td><%= $c->date %></td>
+    <td><%== nl2br $c->purpose %></td>
+    <td><%== money $c->difference %></td>
+    <td><input type="text" name="note[<%= $c->credId %>]"></td>
 </tr>
 %        }
 </table>

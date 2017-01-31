@@ -105,14 +105,15 @@ sub upsert {
     if ( @$to_pay_with ) {
         my $billId = $self->param("billId");
         $db->make_transfers( $to_pay_with => $billId );
-        for my $param ( grep { /^note\[/ } @{ $self->req->params->names } ) {
-            my $note = $self->param($param) || next;
-            s{^note\[}{} && s{\]$}{} for $param;
-            $db->resultset("Transfer")->find({
-                billId => $self->param("billId"), credId => $param
-            })->update({ note => $note });
-        }    
     }                  
+
+    for my $param ( grep { /^note\[/ } @{ $self->req->params->names } ) {
+        my $note = $self->param($param) || next;
+        s{^note\[}{} && s{\]$}{} for $param;
+        $debit->search_related(
+            incomings => { credId => $param }
+        )->update({ note => $note });
+    }    
 
     $self->redirect_to('home');
 
