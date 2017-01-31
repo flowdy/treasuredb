@@ -62,6 +62,13 @@ table td.even_until {
     text-align: center;
 }
 
+table.history p {
+    margin:0;
+}
+table.history p.linked-credit {
+    font-size: smaller;
+}
+
 dl dd + dt {
     border-top: 1px solid lightgrey;
     margin-top: 1em;

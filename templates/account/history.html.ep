@@ -2,16 +2,22 @@
 
 <p>Reverse ordered list:</p>
 
-<table>
-<tr><th>Timestamp</th><th>Purpose (own/other/debit)</th><th>debit</th><th>credit</th><th>note</th></tr>
+<table class="history">
+<tr><th>Timestamp</th><th>Purpose (own/other/debit)</th><th>debit</th><th>credit</th></tr>
 % while ( my $hr = $history->next ) {
 <tr><td><%= $hr->date %></td><td>
-% my $this = $hr->this_credit;
-<strong>On <a href="/credit/<%= $hr->credId %>"><%= <%= $this->credId %></a>:</strong> <%== nl2br $this->purpose %><br>
 % my $that = $hr->that_credit;
-<strong>With <%= $that->account->ID %>/<a href="/credit/<%= $that->credId %>"><%= <%= $that->credId %></a>:</strong> <%== nl2br $that->purpose %><br>
-<strong>Pay <%= $hr->billId %>:</strong> <%== nl2br $hr->purpose %>
-</td><td class="number"><%== money $hr->debit %></td><td class="number"><%== money $hr->credit %></td><td><%= $hr->note %></td></tr>
+% my $this = $hr->this_credit;
+% my $credit_ref = begin
+%== sprintf q{<strong>%s</strong><a href="/credit/%2$d">%d</a>}, shift() ? ($that->account->ID.q{.}, $that->credId) : (q{}, $this->credId)
+% end
+<p><strong><a href="/debit/<%= $hr->billId %>"><%= $hr->billId %></a>:</strong> <%= $hr->purpose %> &rarr; <%== $credit_ref->($hr->debit) %></p>
+<p class="linked-credit">from <%= $credit_ref->($hr->credit) %>, <%= $hr->credit ? $that->purpose : $this->purpose %>
+% if ( $hr->note ) {
+<br>Note: <%= $hr->note %>
+% }
+</p>
+</td><td class="number"><%== money $hr->debit %></td><td class="number"><%== money $hr->credit %></td></tr>
 % }
 </table>
 
