@@ -9,7 +9,7 @@
     <input id="date" name="date" value="<%= $credit->date %>"> (Format: YYYY-MM-DD)
 % end
 % $r{purpose} = begin
-    <input id="purpose" name="purpose" style="width:100%" value="<%= $credit->purpose %>">
+    <textarea id="purpose" name="purpose" style="width:100%"><%= $credit->purpose %></textarea>
 % end
 % $r{category} = begin
 %    my $category = $credit->category // '';
@@ -26,7 +26,7 @@
     <input id="value" name="value" value="<%= $credit->value %>"> Cent (declare target credit with "0")
 % end
 % $r{account} = begin
-    <input id="account" name="account" value="<%= $credit->account->ID %>">
+    <%= $credit->account->ID %>
 % end
 
 <dl class="upsert">
@@ -72,11 +72,10 @@
 % if ( $account //= $credit->account ) {
 <h2>Spend for arrears</h2>
 %    my $arrears = ( ref $account ? $account : app->db->resultset("Account")->find($account) )->current_arrears;
-%    if ( $arrears->first() ) {
-<p><%= $credit->value == $credit->spent ? "The credit is already spent. Unless you revoke any outgoings above, there is no point in checking" : "Check" %> <%= %paid_debits ? "other" : "" %> debits you want to <strong>spend this credit</strong> for:</p>
-<p>Check arrears you want to <strong>use this credit</strong> for.</p>
+%    if ( $arrears->count() ) {
+<p><%= $credit->value && $credit->value == $credit->spent ? "The credit is already spent. Unless you revoke any outgoings above, there is no point in checking" : "Check" %> <%= %paid_debits ? "other" : "" %> debits you want to <strong>spend this credit</strong> for:</p>
 <table>
-<tr><th>S</th><th>date</th><th>purpose</th><th>to pay</th></tr>
+<tr><th>S</th><th>date</th><th>purpose</th><th>to pay</th><th>note</th></tr>
 %        while ( my $d = $arrears->next ) {
 %            next if $paid_debits{ $d->billId };
 <tr><td><input type="checkbox" name="spendFor" value="<%= $d->billId %>"></td>

@@ -12,7 +12,7 @@
     <input id="date" name="date" value="<%= $debit->date %>"> (Format: YYYY-MM-DD)
 % end
 % $r{purpose} = begin
-    <input id="purpose" name="purpose" style="width:100%" value="<%= $debit->purpose %>">
+    <textarea id="purpose" name="purpose" style="width:100%"><%= $debit->purpose %></textarea>
 % end
 % $r{category} = begin
 %    my $category = $debit->category // '';
@@ -102,8 +102,8 @@ oops
 % if ( $account ||= $debit->debtor ) {
 <h2>Pay with credits</h2>
 %    my $credits = app->db->resultset("Account")->find($account)->available_credits;
-%    if ( $credits->first() ) {
-<p><%= $debit->value == $debit->value ? "The debt is already settled. Unless you revoke any incomings above, there is no point in checking" : "Check" %> <%= %used_credits ? "other" : "" %> credits you want to <strong>pay this debit</strong> with:</p>
+%    if ( $credits->count() ) {
+<p><%= $debit->value && $debit->value == $debit->value ? "The debt is already settled. Unless you revoke any incomings above, there is no point in checking" : "Check" %> <%= %used_credits ? "other" : "" %> credits you want to <strong>pay this debit</strong> with:</p>
 <table>
 <tr><th>S</th><th>date</th><th>purpose</th><th>to spend</th><th>note</th></tr>
 %        while ( my $c = $credits->next ) {
