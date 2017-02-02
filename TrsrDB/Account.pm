@@ -4,7 +4,7 @@ package TrsrDB::Account;
 use base qw/DBIx::Class::Core/;
 
 __PACKAGE__->table('Account');
-__PACKAGE__->add_columns(qw/ID type altId IBAN/);
+__PACKAGE__->add_columns(qw/ID name type altId IBAN/);
 __PACKAGE__->set_primary_key('ID');
 
 __PACKAGE__->has_many(

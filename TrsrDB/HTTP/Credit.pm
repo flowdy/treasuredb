@@ -52,7 +52,7 @@ sub upsert {
         return;
     }
 
-    for my $field ( qw/account date purpose category value/ ) {
+    for my $field ( qw/date purpose category value/ ) {
         my $value = $self->param($field);
         $value = undef if !length $value;
         $credit->$field($value);

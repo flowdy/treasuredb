@@ -17,7 +17,7 @@
 <%= $inter_header->($t) %>
 % }
 % my $u = $account->ID;
-<tr><th><a href="/account/<%= $u %>"><%= $u %></a></th>
+<tr><th><a href="/account/<%= $u %>" title="<%= $account->name %>"><%= $u %></a></th>
    <td class="even_until"><%= $bal->even_until // "never" %></td><td class="number"><%== money $bal->arrears %></td><td><a href="<%= $u %>/debits"><img class="icon" alt="List" src="/list.svg" alt="List"></td><td><a title="Add a debit" href="<%= $u %>/out"><img class="icon" src="/add-debit.svg" alt="Charge"></a></td>
 <td class="centered">
 % my $which = ($bal->arrears && 1) + ($bal->available && 1);

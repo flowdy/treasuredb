@@ -1,17 +1,20 @@
-% title $name ? "Account $name" : "Create account";
+% title $id ? "Account $id" : "Create account";
 
 % my %r;
 % $r{ID} = begin
     <input id="ID" name="ID" value="<%= $account->ID %>">
 % end
+% $r{name} = begin
+    <input id="name" name="name" value="<%= $account->name %>">
+% end
 % $r{type} = begin
-    <input id="type" name="type" value="<%= $account->type %>"> (<%= join(", ", @$types) %> or a new?)
+    <input id="type" name="type" value="<%= $account->type %>"> (Currently there: <%= join(", ", @$types) %>)
 % end
 % $r{altId} = begin
     <input id="altId" name="altId" value="<%= $account->altId %>">
 % end
 % $r{IBAN} = begin
-    <input id="IBAN" name="IBAN" value="<%= $account->IBAN %>">
+    <input id="IBAN" name="IBAN" value="<%= $account->IBAN %>"> (may also be empty or '*' – s. help)
 % end
 
 <form method="post">
@@ -32,4 +35,9 @@
 <button type="submit">Submit</button>
 </form>
 
+% my $help = begin
+<p><strong>What to input into "IBAN"?</strong> To restrict outgoing payments from that account to a certain bank account, insert  its account number. To allow outgoing payment to any bank account, input wildcard (*). To disallow outgoing payment from that account, input nothing.</p>
 
+<p>When inserting a proper number, this number must be included in all outgoing payments from that account. Outgoing payments differ from internal payments in that transferCredit is undefined.</p>
+% end
+% stash help => $help;

@@ -12,12 +12,17 @@
 % }
 <form method="post" action="/login"><p>
 
-    User id: <input name="user" type="text" placeholder="user id or email" value="<%= param('user') %>"><br>
-    Password: <input name="password" type="password"><br>
+<dl>
+<dt>User id</dt>
+<dd><input name="user" type="text" placeholder="user id or email" value="<%= param('user') %>"></dd>
+<dt>Password</dt>
+<dd><input name="password" type="password"></dd>
 % if ( my $token = param 'token' ) {
-    Repeat: <input name="samepassword" type="password"><br>
-    <input type="hidden" name="token" value="<%= $token %>"><br>
+<dt>Repeat</dt>
+<dd><input name="samepassword" type="password">
+<input type="hidden" name="token" value="<%= $token %>">
+</dd>
 % }
-    <button type="submit">Login</button>
+<p><button type="submit">Login</button></p>
 
-</p></form>
+</form>

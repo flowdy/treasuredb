@@ -30,24 +30,37 @@ sub upsert {
     my $account_rs = $db->resultset("Account");
     my $account;
     if ( my $name = $self->stash("account") ) {
-        $self->stash( name => $name );
+        $self->stash( id => $name );
         $account = $account_rs->find($name);
     }
     else {
-        $self->stash( name => undef );
+        $self->stash( id => undef );
         $account = $account_rs->new({});
     }
     $self->stash( account => $account );
 
+    my $iban = $self->param("IBAN") // $account->IBAN;
+        
     if ( $self->req->method eq 'POST' ) {
+        my $p = $self->req->params->to_hash;
+        if ( $p->{IBAN} eq q{*} ) {
+            $p->{IBAN} = q{};
+        }
+        elsif ( !$iban ) {
+            delete $p->{IBAN};
+        } 
         for my $field ($account->result_source->columns) {
-            my $value = $self->param($field);
+            my $value = $p->{ $field };
             $account->$field($value);
         }
         $account->update_or_insert();    
         $self->redirect_to("home");
     }
     else {
+        if ( defined( $iban ) ) {
+            $iban = q{*} if !$iban;
+            $account->IBAN($iban);
+        }
         my @types = $account_rs->search({ type => { '!=' => q// } }, {
             columns => ['type'], distinct => 1
         })->get_column("type")->all;
@@ -78,22 +91,22 @@ sub transfer {
     my $db = $self->app->db;
     my $account = $db->resultset("Account")->find( $self->stash("account") );
     
-    my $credits = $account->available_credits;
-    my $arrears = $account->current_arrears;
+    my $credits_rs = $account->available_credits;
+    my $arrears_rs = $account->current_arrears;
 
-    if ( $self->req->method eq 'POST' ) {
-        $db->make_transfers(
-            $self->every_param('credits')
-         => $self->every_param('debits')
-        );
+    my $credit_ids = $self->every_param('credits');
+    my $arrear_ids = $self->every_param('debits');
+
+    if ( $self->req->method eq 'POST' && @$credit_ids && @$arrear_ids ) {
+        $db->make_transfers( $credit_ids => $arrear_ids );
     }
 
-    if ( !( $credits->count && $arrears->count ) ) {
+    if ( !( $credits_rs->count && $arrears_rs->count ) ) {
         $self->redirect_to('home');
         return;
     }
 
-    $self->stash( credits => $credits, arrears => $arrears );
+    $self->stash( credits => $credits_rs, arrears => $arrears_rs );
 
     return;
 

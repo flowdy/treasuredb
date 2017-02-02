@@ -30,9 +30,8 @@
 % end
 % $r{targetCredit} = begin
 %   if ( !@$targets ) {
-<p style="color:red;">There are no target credits available. Target credits are credits of other accounts that either still have a value of 0, or which have already been targetted. Please create a target credit record first, because all debits must refer to one so settlements can be fulfilled.</p>
+<div style="color:red;">There are no target credits available. Target credits are credits of other accounts that either still have a value of 0, or which have already been targetted. Please create a target credit record first, because all debits must refer to one so settlements can be fulfilled.</div>
 %       $targets = [ ['', '', ''] ];
-oops
 %   }
 %   my $cmpacc = $targets->[0][1];
 %   my $target = $debit->targetCredit // '';
@@ -103,7 +102,7 @@ oops
 <h2>Pay with credits</h2>
 %    my $credits = app->db->resultset("Account")->find($account)->available_credits;
 %    if ( $credits->count() ) {
-<p><%= $debit->value && $debit->value == $debit->value ? "The debt is already settled. Unless you revoke any incomings above, there is no point in checking" : "Check" %> <%= %used_credits ? "other" : "" %> credits you want to <strong>pay this debit</strong> with:</p>
+<p><%= $debit->value && $debit->value == $debit->paid ? "The debt is already settled. Unless you revoke any incomings above, there is no point in checking" : "Check" %> <%= %used_credits ? "other" : "" %> credits you want to <strong>pay this debit</strong> with:</p>
 <table>
 <tr><th>S</th><th>date</th><th>purpose</th><th>to spend</th><th>note</th></tr>
 %        while ( my $c = $credits->next ) {
@@ -122,6 +121,6 @@ oops
 %    }
 % }
 
-<button type="submit">Submit</button>
+<p><button type="submit">Submit</button></p>
 
 </form>

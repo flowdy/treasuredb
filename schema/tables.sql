@@ -1,5 +1,6 @@
 CREATE TABLE Account (
   ID PRIMARY KEY NOT NULL,
+  name,
   type NOT NULL,
   altId NOT NULL, -- e.g. when type "member", no. in external member table 
   IBAN -- target account for returned payments (set '' to enable

@@ -71,6 +71,7 @@ table.history p.linked-credit {
 
 input, textarea {
     border: 1px solid #ddd;
+    padding: 2px;
 }
 
 dl dt {
@@ -88,6 +89,7 @@ dl dd {
 select {
     border: 1px solid #ddd;
     background-color:transparent;
+    padding: 2px;
 }
 
 .help {
