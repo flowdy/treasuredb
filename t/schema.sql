@@ -3,7 +3,11 @@ PRAGMA recursive_triggers = ON;
 
 -- To understand the sql below, see the schema.sql file.
 
-INSERT INTO Account VALUES ("Club", "eV", 1, NULL), ("john", "Member", 44, NULL), ("alex", "Member", 6, "DE1234567890123456");
+INSERT INTO Account VALUES
+    ("Club", "Main account", "eV", 1, NULL),
+    ("john", "John Tester", "Member", 44, NULL),
+    ("alex", "Alex Webber", "Member", 6, "DE1234567890123456");
+
 INSERT INTO Category ("label") VALUES ("Membership fees"), ("Service");
 
 INSERT INTO Credit VALUES (1, "Club", "2016-01-01", "Membership fees May 2016 until incl. April 2017", 1, 0, 0),

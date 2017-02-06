@@ -1,0 +1,27 @@
+% stash links => [ '#filter-view' => 'Filter view' ];
+<form action="<%= url_for %>" method="get">
+<div id="filter-view" class="targettable" style="float: left;">
+
+<input type="text" value="<%= param 'purpose' %>" name="purpose" title="purpose" placeholder="Purpose">
+
+% my $categories = app->db->resultset("Category")->search({}, { order_by => "ID" });
+% my $category = param 'category';
+<select id="category" name="category" title="category">
+    <option value="">Purpose</option>
+% while ( my $c = $categories->next ) {
+        <option value="<%= $c->ID %>" <%== $category == $c->ID ? 'selected="selected"' : '' %>>
+            <%= $c->label %>
+        </option>
+% }
+</select>
+
+<input style="width:5em;" type="text" placeholder="from/YYYY[-MM]" value="<%= param 'from' %>" name="from" title="from/YYYY[-MM]"> 
+
+<input style="width:5em;" type="text" placeholder="until YYYY-MM-DD" value="<%= param 'until' %>" name="until" title="until YYYY-MM-DD"> 
+
+</div>
+
+<input type="number" style="width:3em;" name="page" value="<%= (param('page') // 1) + 1 %>" min="1" title="page">
+<button type="submit">Go</button>
+
+</form>
