@@ -1,7 +1,7 @@
 % my $id = stash 'id';
 % title $id ? "Change credit $id" : "Enter new credit";
 
-<form method="post">
+<form class="<%= url_for %>" method="post">
 <h2>Essentials</h2>
 
 % my %r;
@@ -23,7 +23,7 @@
 </select>
 % end
 % $r{value} = begin
-    <input id="value" name="value" value="<%= $credit->value %>"> Cent (declare target credit with "0")
+    <input id="value" name="value" value="<%= $credit->value %>"> Cent (target credit? See <a href="#help">help</a>)
 % end
 % $r{account} = begin
     <%= $credit->account->ID %>
@@ -95,3 +95,8 @@
 <p><button type="submit">Submit</button></p>
 
 </form>
+
+% stash help => $_ for begin
+<h2>How to declare a target credit?</h2>
+<p>A target credit can be declared by assigning it an initial value of 0 (zero).</p>
+% end

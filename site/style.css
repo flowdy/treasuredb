@@ -15,10 +15,17 @@ h1 {
 
 table {
     border-collapse: collapse;
+    width:100%;
 }
 
 table td, table th {
     border: 1px solid darkgrey;
+    vertical-align: top;
+}
+
+table.accounts tr.group-heading th {
+    border:none;
+    vertical-align:middle;
 }
 
 table tr:nth-child(even) {
@@ -44,10 +51,20 @@ table td.number {
     text-align: right;
     font-family: monospace, monospace; /* Hack to prevent browser default size reduction of monospace font */
     font-size:1em;
+    vertical-align: bottom;
 }
 
 table td.mark {
     background-color:rgba(255,0,0,0.1);
+}
+
+table td input {
+    width:100%;
+    box-sizing: border-box;
+}
+
+form {
+    margin: 1em 0;
 }
 
 a.transfer-btn {
@@ -72,6 +89,9 @@ table.history p.linked-credit {
 input, textarea {
     border: 1px solid #ddd;
     padding: 2px;
+}
+input[type=checkbox], input[type=radio] {
+    border: none;
 }
 
 dl dt {
@@ -116,4 +136,18 @@ img.icon {
     font-size:smaller;
     color: darkgrey;
     text-align: center;
+}
+
+a.add-item-btn:link,
+a.add-item-btn:visited {
+    display: block;
+    float: right;
+    font-variant: small-caps;
+    background-color: #eee;
+    border: 2px outset grey;
+    padding: 3px;
+    border-radius: 3px;
+    text-decoration: none;
+    color: inherit;
+    font-weight:normal;
 }

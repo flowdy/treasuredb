@@ -1,5 +1,6 @@
 % title 'Outcome of ' . $account;
 
+<a class="add-item-btn" href="/<%= $account %>/out"><img src="/add-debit.svg" class="icon" alt=""> Add debit</a>
 <p>Listed in reverse order:</p>
 
 <table class="income">

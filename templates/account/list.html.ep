@@ -6,8 +6,8 @@
 % my ($type) = q{};
 % my $inter_header = begin
 % my $group = shift;
-<tr><th colspan="11"><%= $group || 'Club management accounts' %></th>
-<th colspan="2"><a href="/debit?group=<%= $group %>"><img class="icon" src="/add-debit.svg" alt="Charge"> all at once</a></th></tr>
+<tr class="group-heading"><th colspan="11"><%= $group || 'Club management accounts' %></th>
+<th colspan="2"><a class="add-item-btn" href="/debit?group=<%= $group %>"><img class="icon" src="/add-debit.svg" alt="Charge"> all at once</a></th></tr>
 % end
 % while ( my $account = $accounts->next ) {
 % my $bal = $account->balance;
@@ -22,36 +22,35 @@
 <td class="centered">
 % my $which = ($bal->arrears && 1) + ($bal->available && 1);
 % if ( $which == 2 ) {
-   › <a href="<%= $u %>/transfer"><img class="icon" src="/transfer.svg"></a> ‹
+   › <a href="<%= $u %>/transfer"><img class="icon" src="/transfer.svg" alt="ready"></a> ‹
 % }
 % elsif ( $which ) {
    <%== $bal->arrears ? q{›} : q{&nbsp;} %>
-   <img class="icon" src="/wait.svg" style="cursor:not-allowed;">
+   <img class="icon" src="/wait.svg" style="cursor:not-allowed;" alt="wait">
    <%== $bal->available ? q{‹} : q{&nbsp;} %>
 % }
 % else {
-   <img class="icon" src="/even.svg" style="cursor:not-allowed;">
+   <img class="icon" src="/even.svg" style="cursor:not-allowed;" alt="even">
 % }
    </td><td class="number"><%== money $bal->available %></td><td><a href="<%= $u %>/credits"><img class="icon" alt="List" src="/list.svg" alt="List"></a></td><td><a title="Add a credit" href="<%= $u %>/in"><img class="icon" src="/add-credit.svg" alt="Credit"></a></td><td class="number"><%== money $bal->earned %></td><td class="number"><%== money $bal->promised %></td><td><a href="<%= $u %>/history">History</a></td><td><a href="<%= $u %>/report">Report</a></td></tr>
 % } # while
 </table>
 
 % stash links => [ '/account' => "Create account", '/bankStatement' => "Reconstructed bank statement" ];
-% my $help = begin
+% stash help => $_ for begin
 <h2>Column explanation</h2>
 <dl>
-<dt>Even till:</dt>
-<dd><p>Date of debt up to and including which all is settled.</p></dd>
-<dt>Arrears:</dt>
-<dd><p>Unpaid debits</p></dd>
-<dt>Transfer:</dt>
-<dd><p>Link to a view where you can match credit and debit and have the software transfer money in between automatically. Yellow "N/A" means there is no money to transfer as either credit or debit is 0. Green "N/A" means there is no money to transfer because the account is even.</p></dd>
-<dt>Available:</dt>
-<dd><p>Credits that have not been used or not to full extent, yet</p></dd>
-<dt>Earned:</dt>
-<dd><p>Paid debits targetting credits of that account.</p></dd>
-<dt>Promised:</dt>
-<dd><p>Unpaid or not fully paid debits targetting credits of that account.</p></dd>
+<dt>Even until</dt>
+<dd>Date of the debt/bill up to and including which all is settled. Within each group (i.e. account type), accounts are ordered by this ascending date.</dd>
+<dt>Arrears</dt>
+<dd>Debits or partial amounts of which are still outstanding</dd>
+<dt>Transfer</dt>
+<dd>View of credit and debit for you to match and have the software transfer money in between automatically. <img class="icon" src="/transfer.svg" alt="ready"> means you need to take action. <img class="icon" src="/wait.svg" style="cursor:not-allowed;" alt="wait"> means there is no money to transfer as either credit or debit is 0, or <img class="icon" src="/even.svg" style="cursor:not-allowed;" alt="even"> if the account is even.</dd>
+<dt>Available</dt>
+<dd>Credits that have not been used or not to full extent, yet</dd>
+<dt>Earned</dt>
+<dd>Paid debits targetting credits of that account.</dd>
+<dt>Promised</dt>
+<dd>Unpaid or not fully paid debits targetting credits of that account.</dd>
 </dl>
 % end
-% stash help => $help;

@@ -17,7 +17,7 @@
     <input id="IBAN" name="IBAN" value="<%= $account->IBAN %>"> (may also be empty or '*' – s. help)
 % end
 
-<form method="post">
+<form action="<%= url_for %>" method="post">
 
 <dl class="upsert">
 % for my $f ( $account->result_source->columns ) {

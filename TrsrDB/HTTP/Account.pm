@@ -43,7 +43,7 @@ sub upsert {
         
     if ( $self->req->method eq 'POST' ) {
         my $p = $self->req->params->to_hash;
-        if ( $p->{IBAN} eq q{*} ) {
+        if ( ($p->{IBAN}//q{}) eq q{*} ) {
             $p->{IBAN} = q{};
         }
         elsif ( !$iban ) {

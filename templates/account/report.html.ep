@@ -7,5 +7,5 @@
 % $total += $record->value;
 <tr><td><%= $record->date %></td><td class="number"><%== money $record->value %></td><td><%== nl2br $record->purpose %></td></tr>
 % } 
-<tr><td style="text-align:right;">In total:</td><td class="number"><%== money $total %></td></tr>
+<tr style="border-top: 2px solid black"><td style="text-align:right;">In total:</td><td class="number"><%== money $total %></td></tr>
 </table>

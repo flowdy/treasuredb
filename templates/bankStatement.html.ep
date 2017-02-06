@@ -6,9 +6,17 @@
 % while ( my $record = $records->next ) {
 %     $total_credit += $record->credit;
 %     $total_debit  += $record->debit;
-<tr><td><%= $record->date %></td><td><%= $record->purpose %></td><td><%= $record->account %></td><td class="number"><%== money $record->debit %></td><td class="number"><%== money $record->credit %></td></tr>
+%     $total_credit -= $total_debit;
+%     if ( $total_credit > 0 ) {
+%         $total_debit = 0;
+%     }
+%     if ( $total_credit < 0 ) {
+%         $total_debit = abs $total_credit;
+%         $total_credit = 0;
+%     }
+<tr><td><%= $record->date %></td><td><%== nl2br $record->purpose %></td><td><%= $record->account %></td><td class="number"><%== money $record->debit %></td><td class="number"><%== money $record->credit %></td></tr>
 % } 
-<tr><td colspan="3" style="text-align:right;">Current balance:</td><td class="number"><%== $total_debit ? money $total_debit : '' %></td><td class="number"><%== $total_credit ? money $total_credit : '' %></td>
+<tr style="border-top:2px solid black;"><td colspan="3" style="text-align:right;">Current balance:</td><td class="number" style="color:red;"><%== $total_debit ? money $total_debit : '' %></td><td class="number"><%== $total_credit ? money $total_credit : '' %></td>
 </table>
 
 %= include 'filter-widget'

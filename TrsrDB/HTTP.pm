@@ -88,7 +88,7 @@ sub startup {
   $check->get('/bankStatement' => sub {
       my $c = shift;
       my $records = $c->app->db->resultset("ReconstructedBankStatement")
-                  ->search( process_table_filter_widget($c) );
+                  ->search( process_table_filter_widget($c, {}, { order => 'date' }) );
       $c->stash( records => $records );
       $c->render('bankStatement');
   });
@@ -339,7 +339,7 @@ sub process_table_filter_widget {
 
 sub _get_trace_placeholder { \<<'EOF'
 In this area, the server can trace SQL commands executed to fulfill your request. If the admin wants that, they can run the server with environment variable DBIC_TRACE=1.
-All substantial logic of Treasure DB is done in the scope of the database itself. In consequence, you could do without this HTTP interface and input all SQL commands shown here directly in a general-purpose SQLite3 user interface. Thus you will get roughly the same results.
+All substantial logic of Treasure DB is realized as triggers and views right in the database file. In consequence, you could do without this HTTP interface and input all SQL commands directly in a general-purpose SQLite3 user interface. Thus you would get essentially the same results, except they do not look as nice.
 EOF
 }
 1;

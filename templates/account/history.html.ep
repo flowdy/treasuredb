@@ -9,12 +9,15 @@
 % my $that = $hr->that_credit;
 % my $this = $hr->this_credit;
 % my $credit_ref = begin
-%== sprintf q{<strong>%s</strong><a href="/credit/%2$d">%d</a>}, shift() ? ($that->account->ID.q{.}, $that->credId) : (q{}, $this->credId)
+% my $that_acc = $that && $that->account;
+% my $that_account_id = $that ? $that_acc->ID : q{(out)};
+% my $that_credit_id = $that ? $that->credId : "";
+%== sprintf q{<strong>%s</strong><a href="/credit/%2$d">%d</a>}, shift() ? ($that_account_id.q{:}, $that_credit_id) : (q{}, $this->credId)
 % end
-<p><strong><a href="/debit/<%= $hr->billId %>"><%= $hr->billId %></a>:</strong> <%= $hr->purpose %> &rarr; <%== $credit_ref->($hr->debit) %></p>
-<p class="linked-credit">from <%= $credit_ref->($hr->credit) %>, <%= $hr->credit ? $that->purpose : $this->purpose %>
+<p><strong><a href="/debit/<%= $hr->billId %>"><%= $hr->billId %></a>:</strong> <%== nl2br $hr->purpose %> &rarr; <%== $credit_ref->($hr->debit) %></p>
+<p class="linked-credit">&uarr; <%= $credit_ref->($hr->credit) =%>, <%= $hr->credit ? $that->purpose : $this->purpose %>
 % if ( $hr->note ) {
-<br>Note: <%= $hr->note %>
+<br><em>Note: <%= $hr->note %></em>
 % }
 </p>
 </td><td class="number"><%== money $hr->debit %></td><td class="number"><%== money $hr->credit %></td></tr>

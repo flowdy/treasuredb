@@ -39,7 +39,7 @@
 % }
 % if ( defined $sql ) {
 <div class="targettable" id="sql">
-<p>Please note that, to run the SQL commands directly in another tool, you might need to resolve the prepared statements manually. Just replace all question marks by the values listed after the colon in each line.</p>
+<p>Please note that if you want to run the SQL commands directly in another tool, you might need to resolve the prepared statements manually. Just replace all question marks by the values listed after the colon in each line.</p>
 <textarea rows="5" style="width:100%;border:1px inset lightgrey;" readonly="readonly">
 %== $$sql
 </textarea></div>

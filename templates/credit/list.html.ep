@@ -1,5 +1,6 @@
 % title 'Income of ' . $account;
 
+<a class="add-item-btn" href="/<%= $account %>/in"><img src="/add-credit.svg" class="icon" alt=""> Add credit</a>
 <p>Listed in reverse order:</p>
 
 <table class="income">
