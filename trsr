@@ -1,0 +1,478 @@
+#!/usr/bin/env perl
+use strict;
+
+my $db;
+use TrsrDB \$db;
+use open qw/:std :encoding(utf8)/;
+
+my %dispatcher = (
+    charge => \&Commands::charge_account,
+    ct  => sub {
+        Commands::charge_account();
+        Commands::make_transfers();
+    },
+    cts => sub {
+        Commands::charge_account();
+        Commands::make_transfers();
+        Commands::balance_status();
+    },
+    ctr => sub {
+        Commands::charge_account();
+        Commands::make_transfers();
+        Commands::balance_status(1);
+    },
+    report => sub {
+        Commands::balance_status(1);
+    },
+    status => \&Commands::balance_status,
+    transfer => \&Commands::make_transfers,
+    tr  => sub {
+        Commands::make_transfers();
+        Commands::balance_status(1);
+    },
+    ts  => sub {
+        Commands::make_transfers();
+        Commands::balance_status();
+    }
+);
+
+package Commands;
+use Text::Wrap qw(wrap);
+use Carp qw(croak);
+
+use Getopt::Long;
+
+my %targets;
+my %OPTS = (
+    'account' => \my $ACCOUNT,
+    'target-credit' => \%targets
+);
+GetOptions( \%OPTS,
+  '1', 'account|a=s', 'target|t=s', 'target-credit|tcr=i', 'source|s=s',
+  'date|d=s', 'value|v=i', 'purpose|p=s', 'bill-id|b=s'
+);
+
+sub _single_charge {
+    my $accounts = $db->resultset("Account");
+
+    _require_value();
+    _require_purpose();
+    _provide_date();
+
+    my $billId = delete $OPTS{'bill-id'}
+        and _require_target();
+
+    my $charger = sub {
+        my ($account, $billId) = @_;
+        my $what = $billId ? 'add_to_debit' : 'add_to_credit';
+        return $account->$what({
+            $billId ? (
+                billId => $billId,
+                targetCredit => delete( $OPTS{target} ),
+            ) : (),
+            map { $_ => $OPTS{$_} } qw(value purpose date),
+        });
+    };
+
+    if ( $ACCOUNT ) {
+        my $account = $accounts->find({ ID => $ACCOUNT });
+        my $record = $charger->($account, $billId);
+        if ( !$billId and my $t = $OPTS{target} ) {
+            $db->make_transfers( $record->ID => $t );
+        }
+    }
+    elsif ( $billId =~ s{ @(\w+) }{ %s }xms ) {
+        $accounts = $accounts->search({ type => $1 });
+        while ( my $account = $accounts->next ) {
+            $charger->( $account, sprintf $billId, $account->ID );
+        }
+    }
+    else {
+        die "Sorry, you haven't specified account(s) to charge";
+    }
+
+}
+
+sub _require_value {
+    until ( $OPTS{value} && $OPTS{value} =~ m{^\d+(\.\d\d)?$} ) {
+        print "Charge value (cent part omittable): ";
+        chomp( $OPTS{value} = <STDIN> );
+    }
+    $_ = integer_money_value($_) for $OPTS{value};
+}
+
+sub _require_purpose {
+    until ( $OPTS{purpose} ) {
+        print "Purpose: ";
+        chomp( $OPTS{purpose} = <STDIN> );
+    }
+}
+
+sub _provide_date {
+    my ($YEAR, $MONTH, $DAY) = (localtime)[3,4,5];
+    $YEAR += 1900; $MONTH++;
+    until ( $OPTS{date} && $OPTS{date} =~ m{\d{4}-?\d\d-?\d\d} ) {
+
+        printf "Full date [YYYY-MM-DD] or year [%d]: ", $YEAR;
+        chomp( my $year = <STDIN> );
+        if ( !length($year) ) {}
+        elsif ( $year =~ m{^(\d{4})-(\d\d)-(\d\d)$} ) {
+            ($YEAR, $MONTH, $DAY) = ($1, $2, $3);
+            goto ASSIGN;
+        }
+        elsif ( $year =~ m{^(\d\d)?\d\d$} && $year > 0 ) {
+            substr $year, 0, 0, 20 if !$1;
+            if ( $year ne $YEAR ) {
+                $YEAR = $year;
+                $_ = '' for $MONTH, $DAY;
+            }
+        }
+        else { redo; }
+        
+        printf "Month [%d]: ", $MONTH;
+        chomp( my $month = <STDIN> );
+        if ( !length( $month ) && $MONTH ) {}
+        elsif ( $month !~ m{\D} && $month > 0 && $month < 13 ) {
+            if ( $month != $MONTH ) {
+                $MONTH = $month;
+                $DAY = '';
+            }
+        }
+        else { redo; }
+
+        printf "Day [%d]: ", $DAY;
+        chomp( my $day = <STDIN> );
+        if ( !length( $day ) ) {}
+        elsif ( $day !~ m{\D} && $day > 0 && $month < 31 ) {
+            $DAY = $day;
+        }
+        else { redo; }
+
+        ASSIGN:
+        $OPTS{date} = sprintf "%4d-%02d-%02d", $YEAR, $MONTH, $DAY;
+
+    }
+}
+
+sub _require_target {
+    my $t;
+    until ( $t = $OPTS{target} and $t =~ m{^\d+$} ) {
+        unless ( $t ) {
+            print "Target credit id: ";
+            chomp( my $t = <STDIN> );
+        }
+        if ( $t =~ m{ \A \? (\w+) \z } ) {
+            $OPTS{target} = _select_target_credit_from($t);
+        }
+    }
+}
+
+sub charge_account {
+    goto &_single_charge if $OPTS{1};
+
+    print "Enter records ...\n";
+
+    # Possible line formats:
+    # -------------------------------------------------------
+    # Date Account Var Purpose            :: Target credit (TCr)
+    # Date Account +Amount Purpose        :: Payment Credit
+    # Date Account -Amount TCr ID Purpose :: Bill
+    # Date Account <Amount ID Purpose     :: Outgoing payment
+    # Please note: Omit Account if specified on commandline.
+
+    my @transfers;
+
+    while ( defined( my $line = <ARGV> ) ) {
+        chomp $line;
+        _strip_comment_from($line) // next;
+        my ($date, $account, $amount, $purpose) = $ACCOUNT
+            ? do { my @columns = split /[,\s]\s*/, $line, 3;
+                   splice @columns, 1, 0, $ACCOUNT;
+                   @columns }
+            : split /[,\s]\s*/, $line, 4
+            ;
+
+        $account = $db->resultset("Account")->find($account)
+            // die "User not found: $account\n";
+
+        if ( $amount =~ m{^[a-z]}i ) {
+            _append_adj_lines_to($purpose);
+            my $r = record_credit($date, $account, $purpose, 0);
+            $targets{ $amount } = $r->credId;
+        }
+        elsif ( $amount =~ s/^([<-])// ) {
+
+            (my ($tgt, $billId), $purpose)
+                = $1 eq q{<} ? (undef, split /\s+/, $purpose, 2)
+                             : (split /\s+/, $purpose, 3)
+                             ;
+
+            _append_adj_lines_to($purpose);
+
+            $DB::single=1;
+
+            if ( $purpose =~ s{ \s* << \s* (.+?) \r? \n? \z }{}xms ) {
+                push @transfers, [
+                   map { /\D/ ? $targets{ $_ } : $_ } split /,\s*/, $1
+                ] => $billId;
+            }
+                
+            if ( my ($var, $account) = $tgt =~ m{^([A-Za-z]\w+)([?=]\w+)$} ) {
+                my $op = substr $account, 0, 1;
+                if ( $op eq q{=} ) {
+                    $tgt = $targets{ $var } = $account;
+                }
+                else {
+                    print "Please select target credit to reference by $var:\n",
+                          "-------------------------------------------------\n";
+                    $tgt = $targets{ $var }
+                         = select_target_credit_from($account);
+                }
+            }
+            elsif ( $tgt =~ /^[a-z]/i ) {
+                $tgt = $targets{ $tgt }
+                    // croak "Target credit not declared: $tgt!\n";
+            }
+            record_debit(
+                $date, $account, $billId, $purpose,
+                integer_money_value($amount), $tgt
+            );    
+            
+        }
+        elsif ( ($amount) = $amount =~ m{ \A \+? (\d+) \z }xms ) {
+            my $tgt = $purpose =~ s{ \s* >> \s* (.+) \z }{}xms && $1;
+            _append_adj_lines_to($purpose);
+            my $c = record_credit(
+                $date, $account, $purpose, integer_money_value($amount)
+            );
+            push @transfers, $c->credId => $tgt if $tgt;
+        }
+        else {
+            die "Amount cannot be parsed: $amount\n";
+        }
+    }
+
+    if ( @transfers ) {
+        my $t = $db->make_transfers( @transfers );
+        if ( $t ) {
+            printf "Transferred %f in total.\n", $t;
+        }
+        else {
+            print "No transfers could be made.\n";
+        }
+    }
+}
+
+sub _strip_comment_from {
+    my $comment;
+    $comment .= $1 while $_[0] =~ s{ \s+ (?<!\\) \# (.*) $ }{}gxm;
+    $comment =~ s{\\#}{#}gxms;
+    return( $comment or length($_[0]) ? q{} : undef );
+}
+ 
+sub integer_money_value {
+    my $val = shift;
+    die "Not a number: $val" if $val =~ /[^\d.]/;
+    $val =~ s{ ( \. (\d\d) ) \z }{}xms;
+    $val *= 100;
+    if ( $1 ) { $val += $2 }
+    return $val;
+}
+
+sub _append_adj_lines_to {
+    my ($has_more, $line);
+    for ( $_[0] //= do { $has_more = 1; <ARGV> } ) {
+        if ( s/^"// .. s/(?<!")(")(?!")// || $has_more) {
+            $line = <ARGV> if $has_more = !$1;
+            last if $line eq $/;
+            $line =~ s{^\s+}{};
+            $_ .= $line;
+            redo;
+        }
+    }
+    &_strip_comment_from;
+}
+
+sub record_credit {
+    my ($date, $account, $purpose, $amount) = @_;
+    return $account->credits->create({
+        date => $date,
+        account => $account,
+        purpose => $purpose,
+        value => $amount
+    });
+}
+
+sub record_debit {
+    my ($date, $debtor, $billId, $purpose, $value, $targetCredit) = @_;
+    return $db->resultset("Debit")->create({
+        billId => $billId,
+        date => $date,
+        debtor => $debtor->ID,
+        purpose => $purpose,
+        value => $value,
+        targetCredit => $targetCredit,
+    });
+}
+
+sub select_target_credit_from {
+    my ($account) = @_;
+
+    croak "Interactive target credit selection is not possible"
+        if !( -t STDIN );
+
+    $account = $db->resultset("Account")->find($account);
+    my $credits = $account->credits->search({}, {
+        join => 'income',
+        group_by => ['income.targetCredit'],
+        having => \[ 'ifnull(sum(income.paid),0) = me.value' ],
+    });
+
+    croak $account->ID
+        . " has no credits to receive settlements of debt"
+        if !$credits->count;
+
+    while ( my $c = $credits->next ) {
+        printf "%d) %s %s\n", $c->credId, $c->date, $c->purpose;
+    }
+
+    while (1) {
+        print "Which credit do you want to target? ";
+        chomp( my $input = <STDIN> );
+        return $input if $credits->find($input);
+        warn "Credit ID $input is not a listed option.\n";
+    }
+
+    return;
+
+}
+
+sub make_transfers {
+    print "Make transfers ...\n";
+
+    if ( ! -t STDIN ) {
+        die "Input expected from interactive terminal";
+    }
+
+    my $search_opts = { order_by => { -asc => ['date'] } };
+    my $avcredits = $db->resultset("AvailableCredits")->search(
+        { $OPTS{source} ? (
+             credId => { -in => TrsrDB::expand_ids($OPTS{source}) }
+          ) : ()
+        },
+        $search_opts
+    );
+    my $transfers = $db->resultset("Transfer");
+
+    CREDIT:
+    while ( my $c = $avcredits->next ) {
+
+        printf " * [%d] %s has %d available in credit %d) %s\n",
+            $c->date, $c->account->ID, $c->difference, $c->credId, $c->purpose;
+
+        my $suggestions = $c->suggested_to_pay->search(
+            { $OPTS{target} ? (
+                 billId => { -in => TrsrDB::expand_ids($OPTS{target}) }
+              ) : ()
+            },
+            $search_opts
+        );
+
+        my $last_input = q{ };
+
+        DEBIT:
+        while ( my $s = $suggestions->next ) {
+            printf "   - [%s] %s: %s? (%s)\b\b", $s->date, $s->billId,
+                $s->purpose, $last_input;
+            chomp( my $input = <STDIN> );
+            $input = $last_input if !length($input);
+            if ( lc($input) =~ /^y(es)?$/i ) {
+                $transfers->create({
+                    credId => $c->credId, billId => $s->billId
+                });
+            }
+            elsif ( !$input || lc($input) !~ /^no?$/i ) {
+                print "Input invalid!\n";
+                redo DEBIT;
+            }
+            $last_input = $input;
+        }
+
+    }
+}
+
+sub balance_status {
+    my ($with_report) = @_;
+    print "Get balance status ...\n";
+    my $results = $db->resultset("Balance");
+    my $header = "\tavailbl\tearned\tspent\tpromise\tarrears\teven_until\n";
+    print "ID", $header unless $with_report;
+    while ( my $r = $results->next ) {
+        my %val = $r->get_columns();
+        if ($with_report) { _balance_report( $val{ID} ) }
+        print join "\t", $with_report ? "Balance:\n$header" : $val{ID}, @val{qw{
+            available earned spent promised arrears even_until
+        }};
+        print "\n";
+    }
+}
+
+sub _balance_report {
+    my ($id) = @_;
+    print "Report of account $id:\n", "=" x 76, "\n";
+    my $rs = $db->resultset("Account")->find($id)->report();
+    my ($i, $state) = (0, 1);
+
+    my $c = 0;
+
+    my $print_subline = sub {
+        my $row = shift;
+        $row->{value} /= 100;
+        my $tab = " " x (2 + length $c);
+        print wrap( $row->{value} > 0 ? "$c. " : $tab, $tab, sprintf(
+            "\t%+f\t%s @ %s\n", @{$row}{qw/value purpose date/}
+        ));
+    };
+    my $print_remainder = sub {
+        my $c = $db->resultset("AvailableCredits")->find($c) // return;
+        print " " x length( $c->credId ), " (+", $c->difference,
+              " left available.)";
+    };
+
+    while ( my $row = $rs->next ) {
+        $i++;
+        my %d = $row->get_columns();
+        if ( $c && !defined $d{credId} ) {
+            print "--- Current arrears: ---\n";
+            $c = 0;
+            redo;
+        }
+
+        $d{credId} //= 0;
+        if ( $d{value} > 0 ) {
+            $print_remainder->() if $c;
+            $c = $d{credId};
+        }
+        elsif( $d{credId} != $c ) {
+            die "Unexpected transfer for credId $d{credId}!\n";
+        }
+
+        $print_subline->(\%d);
+
+    }
+
+    if ( !$i ) {
+        print "Account is evened out, alright.\n";
+    }    
+}
+
+package main;
+
+my $cmd = shift;
+if ( my $sref = $dispatcher{ $cmd } ) {
+    $sref->();
+}
+else { 
+    die qq{Command not supported: $cmd\n};
+}
+
