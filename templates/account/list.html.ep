@@ -17,8 +17,8 @@
 <%= $inter_header->($t) %>
 % }
 % my $u = $account->ID;
-<tr><th><a href="/account/<%= $u %>" title="<%= $account->name %>"><%= $u %></a></th>
-   <td class="even_until"><%= $bal->even_until // "never" %></td><td class="number"><%== money $bal->arrears %></td><td><a href="<%= $u %>/debits"><img class="icon" alt="List" src="/list.svg" alt="List"></td><td><a title="Add a debit" href="<%= $u %>/out"><img class="icon" src="/add-debit.svg" alt="Charge"></a></td>
+<tr class="<%= $u %>"><th class="ID"><a href="/account/<%= $u %>" title="<%= $account->name %>"><%= $u %></a></th>
+   <td class="even_until"><%= $bal->even_until // "never" %></td><td class="arrears number"><%== money $bal->arrears %></td><td><a href="<%= $u %>/debits"><img class="icon" alt="List" src="/list.svg" alt="List"></td><td><a title="Add a debit" href="<%= $u %>/out"><img class="icon" src="/add-debit.svg" alt="Charge"></a></td>
 <td class="centered">
 % my $which = ($bal->arrears && 1) + ($bal->available && 1);
 % if ( $which == 2 ) {
@@ -32,7 +32,7 @@
 % else {
    <img class="icon" src="/even.svg" style="cursor:not-allowed;" alt="even">
 % }
-   </td><td class="number"><%== money $bal->available %></td><td><a href="<%= $u %>/credits"><img class="icon" alt="List" src="/list.svg" alt="List"></a></td><td><a title="Add a credit" href="<%= $u %>/in"><img class="icon" src="/add-credit.svg" alt="Credit"></a></td><td class="number"><%== money $bal->earned %></td><td class="number"><%== money $bal->promised %></td><td><a href="<%= $u %>/history">History</a></td><td><a href="<%= $u %>/report">Report</a></td></tr>
+   </td><td class="available number"><%== money $bal->available %></td><td><a href="<%= $u %>/credits"><img class="icon" alt="List" src="/list.svg" alt="List"></a></td><td><a title="Add a credit" href="<%= $u %>/in"><img class="icon" src="/add-credit.svg" alt="Credit"></a></td><td class="earned number"><%== money $bal->earned %></td><td class="promised number"><%== money $bal->promised %></td><td><a href="<%= $u %>/history">History</a></td><td><a href="<%= $u %>/report">Report</a></td></tr>
 % } # while
 </table>
 

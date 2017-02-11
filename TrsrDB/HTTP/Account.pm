@@ -43,18 +43,27 @@ sub upsert {
         
     if ( $self->req->method eq 'POST' ) {
         my $p = $self->req->params->to_hash;
+
         if ( ($p->{IBAN}//q{}) eq q{*} ) {
             $p->{IBAN} = q{};
         }
         elsif ( !$iban ) {
             delete $p->{IBAN};
         } 
+
+        if ( $p->{ID} !~ m{ \A [a-z] \w+ \z }aixms ) {
+            die "Invalid ID: Must consist of ascii letters/numbers/",
+                "underscores, but always begin with a letter";
+        }
+ 
         for my $field ($account->result_source->columns) {
             my $value = $p->{ $field };
             $account->$field($value);
         }
+
         $account->update_or_insert();    
         $self->redirect_to("home");
+
     }
     else {
         if ( defined( $iban ) ) {
