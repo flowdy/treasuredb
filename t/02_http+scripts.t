@@ -28,7 +28,7 @@ $t->post_ok("/account" => form => $_ )->header_is( Location => "/" )
         { ID => "john", name => "John Tester", type => "Member", altId => 44 },
         { ID => "alex", name => "Alex Webber", type => "Member", altId => 6, IBAN => "DE12345678901234567890" },
         { ID => "rose", name => "Delia Rosenthal", altId => 45, type => 'Member' },
-        { ID => "flow", name => "Florian Hess", type => 'Member' },
+        { ID => "flow", name => "Florian Hess", altId => 67, type => 'Member' },
     ; 
 
 done_testing();
