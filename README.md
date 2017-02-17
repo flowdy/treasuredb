@@ -5,6 +5,99 @@ TreasureDB is a plain SQLite database application to observe and trace the finan
 non-profit registered society or club.  The ideal state of balance is zero both in debit
 and in credit because they even out. In Germany, such clubs may not accumulate reserves.
 
+Basics
+------
+
+As it is a SQLite3 database with all consistency and calculatory logic built in, you only
+need the `sqlite3` binary or any sqlite3 GUI software to run it. Please note the tools
+beyond that are not yet portable. A part of them require the bash and a unix/linux system.
+
+1. Ensure sqlite3 is installed
+
+1. Run the test suite: `bash t/schema.sh` (on Linux and unix systems with Bash installed)
+
+        # Or go by foot and test manually a little bit further
+        treasuredb $ export TRSRDB_SQLITE_FILE="..." # wherever you want to save it
+        treasuredb $ cat schema/{tables,*/*}.sql | sqlite3 $TRSRDB_SQLITE_FILE
+        treasuredb $ sqlite3 $TRSRDB_SQLITE_FILE
+        SQLite version 3.8.7.1 2014-10-29 13:59:56
+        Enter ".help" for usage hints.
+        sqlite> .read t/schema.sql
+        ...
+
+1. Use it:
+
+  ```
+  export TRSRDB_SQLITE_FILE="..." # wherever you want to save it 
+  cat schema/{tables,*/*}.sql | sqlite3 $TRSRDB_SQLITE_FILE
+  ./trsr $COMMAND
+  ```
+
+  `$COMMAND` can be one of the following:
+
+    * `charge` - input a batch of csv lines representing incoming and outgoing payments
+    * `ct` - charge, then make transfer (interactive assistent)
+    * `cts` - like ct, but output finally status of all
+    * `ctr` - like ct, but output finally reports of all
+    * `report` - get only reports
+    * `sql` - execute sqlite3 shell with all necessary pragmata and with line output
+    * `status` - get only statuses
+    * `transfer` - only make transfers (interactive assistent)
+    * `tr` - transfer, and output report
+    * `ts` - transfer, and output statuses
+
+Input to `./trsr charge`
+------------------------
+
+You can separate the fields of each line by a comma and optional whitespace, or at least one whitespace. The order of columns is:
+
+ * The booking date in format YYYY-MM-DD,
+ * The account name,
+ * The value if it is a debit,
+ * The value if it is a credit,
+ * The purpose (in the case of a debit, it must start with bill ID and colon),
+ * Optional: "<< Comma-separated list of credit IDs used to pay the debt" or ">> Comma-separated list of bill IDs the booked income is used for", respectively
+
+### Multi-line purposes
+
+Multi-line purposes must either be surrounded by " (escape literal " by doubling it), or started in the next line and terminated with an empty one.
+
+### How to book an incoming payment
+
+In the credit column must be a value greater than 0. Cent must be passed as a decimal part, i.e. "100" really mean 100.00, not 1.00! In the debit column you MAY input a name starting with a letter (otherwise it needs to be just "+"), by which you can refer to a credit in lines below instead of the number.
+
+### How to enter a target credit
+
+A target credit is defined as initially equal 0.
+
+### How to make an internal debt
+
+A debit, recognized by an amount in the debit column, can have a target credit name or number in the credit column.
+
+### How to book an outgoing payment
+
+An outgoing payment must not have a target credit. Leave that field empty.
+
+HTTP interface
+--------------
+
+Treasure DB includes a rudimentary HTTP interface. It requires Mojolicious. The interface
+is developped and tested on version 7.13 onwards. 
+
+You can start it with `./trsr server`. It will stay in the foreground. To start it in daemon mode,
+use `./trsr server >/tmp/trsr_db.log 2>&1 & disown` in the bash shell.
+
+After first start, you will need to create a user: `./httpuser -a $username -g 2`.
+The link that will be output leads you to an extended login form. Please enter a (good) password
+twice, so typos are unlikely. The -g (or --grade) argument can be 0, 1 or 2:
+
+  * 2 is admin who has complete read-write access.
+  * 1 means auditor with complete view without writing permission.
+  * 0 means auditor who can view only the type-less accounts, e.g.
+    the club account is recommended to be without type, or(!) an account
+    named identically.
+
+
 How does it work?
 -----------------
 
@@ -40,37 +133,6 @@ Using the sqlite3 database purposefully means two things:
    linking records from the `CurrentDebts` and from the `AvailableCredits` tables. Otherwise,
    ensure that members make the transfers they are obligated to and return any money that is paid
    too much unless the indicated purposes, if any, also refer to dues in certain future.
-
-Basic Installation
-------------------
-
-As it is a SQLite3 database with all consistency and calculatory logic built in, you only
-need the `sqlite3` binary or any sqlite3 GUI software to run it.
-
-1. Ensure sqlite3 is installed
-
-1. Run the test suite: `./test.sh` (on Linux and unix systems with Bash installed)
-
-        # Or go by foot and test manually a little bit further
-        treasuredb $ sqlite3
-        SQLite version 3.8.7.1 2014-10-29 13:59:56
-        Enter ".help" for usage hints.
-        Connected to a transient in-memory database.
-        Use ".open FILENAME" to reopen on a persistent database.
-        sqlite> .read schema.sql
-        
-        sqlite> .read t/schema.sql
-        ...
-
-1. Setup the database: `sqlite3 treasure.db < schema.sql`
-
-1. Study the files to learn how to work with the system: `less schema.sql t/schema.???`
-
-HTTP interface
---------------
-
-Treasure DB includes a rudimentary HTTP interface. It requires Mojolicious. The interface
-is developped and tested on version 7.13 onwards. 
 
 License
 -------
