@@ -36,7 +36,7 @@
 % } # while
 </table>
 
-% stash links => [ '/account' => "Create account", '/bankStatement' => "Reconstructed bank statement" ];
+% stash links => [ '/account' => "Create account", '/batch-processor' => "Batch Processor", '/bankStatement' => "Reconstructed bank statement" ];
 % stash help => $_ for begin
 <h2>Column explanation</h2>
 <dl>

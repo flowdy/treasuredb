@@ -58,7 +58,8 @@ table td.mark {
     background-color:rgba(255,0,0,0.1);
 }
 
-table td input {
+table td input,
+textarea {
     width:100%;
     box-sizing: border-box;
 }

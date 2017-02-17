@@ -97,12 +97,14 @@ sub startup {
       my $c = shift;
       return $c->stash('grade') > 1 || undef;
   });
+
   $admin->any('/admin')->to('admin#dash');
   $admin->any( [qw/GET POST/] => '/account/:account' => { account => undef })
       ->to('account#upsert');
   $admin->any( [qw/GET POST/] => '/:account/in')->to('credit#upsert');
   $admin->any( [qw/GET POST/] => '/:account/out')->to('debit#upsert');
   $admin->post('/:account/transfer')->to('account#transfer');
+  $admin->any( [qw/GET POST/] => '/batch-processor' )->to('account#batch_processor');
   $admin->any( [qw/GET POST PATCH/] => '/credit/:id' )->to('credit#upsert');
   $admin->any( [qw/GET POST/] => '/credit')->to('credit#upsert');
   $admin->any( [qw/GET POST PATCH/] => '/debit/*id' )->to('debit#upsert');

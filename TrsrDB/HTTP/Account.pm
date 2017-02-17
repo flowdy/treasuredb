@@ -3,6 +3,7 @@ use strict;
 package TrsrDB::HTTP::Account;
 use Mojo::Base 'Mojolicious::Controller';
 use Carp qw(croak);
+use FindBin qw($Bin);
 
 sub list {
     my $self = shift;
@@ -77,6 +78,25 @@ sub upsert {
     }
 
     return;
+}
+
+sub batch_processor {
+    my $self = shift;
+
+    if ( $self->req->method eq 'POST' ) {
+        my $text = $self->req->headers->content_type =~ m{^text/plain\b}
+                 ? $self->req->body
+                 : $self->param("batch")
+                 ;
+        open my $fh, '<', \$text;
+        require "$Bin/trsr" or die;
+        $self->app->db->storage->txn_do(sub {
+            Commands::act_on_other_db($self->app->db);
+            Commands::charge_account($fh);
+        });
+        $self->redirect_to('home');
+    }
+
 }
 
 sub history {

@@ -1,58 +1,22 @@
 #!/usr/bin/env perl
 use strict;
 
+my (%OPTS, $ACCOUNT, %targets);
+
+package Commands {
+use Text::Wrap qw(wrap);
+use Carp qw(croak);
+use Scalar::Util qw(openhandle);
+
 my $db;
 use TrsrDB \$db;
 use open qw/:std :encoding(utf8)/;
 
-my %dispatcher = (
-    charge => \&Commands::charge_account,
-    ct  => sub {
-        Commands::charge_account();
-        Commands::make_transfers();
-    },
-    cts => sub {
-        Commands::charge_account();
-        Commands::make_transfers();
-        Commands::balance_status();
-    },
-    ctr => sub {
-        Commands::charge_account();
-        Commands::make_transfers();
-        Commands::balance_status(1);
-    },
-    report => sub {
-        Commands::balance_status(1);
-    },
-    status => \&Commands::balance_status,
-    transfer => \&Commands::make_transfers,
-    tr  => sub {
-        Commands::make_transfers();
-        Commands::balance_status(1);
-    },
-    ts  => sub {
-        Commands::make_transfers();
-        Commands::balance_status();
-    }
-);
+sub act_on_other_db {
+    $db = shift;
+}
 
-package Commands;
-use Text::Wrap qw(wrap);
-use Carp qw(croak);
-
-use Getopt::Long;
-
-my %targets;
-my %OPTS = (
-    'account' => \my $ACCOUNT,
-    'target-credit' => \%targets
-);
-GetOptions( \%OPTS,
-  '1', 'account|a=s', 'target|t=s', 'target-credit|tcr=i', 'source|s=s',
-  'date|d=s', 'value|v=i', 'purpose|p=s', 'bill-id|b=s'
-);
-
-sub _single_charge {
+sub single_charge {
     my $accounts = $db->resultset("Account");
 
     _require_value();
@@ -64,7 +28,7 @@ sub _single_charge {
 
     my $charger = sub {
         my ($account, $billId) = @_;
-        my $what = $billId ? 'add_to_debit' : 'add_to_credit';
+        my $what = $billId ? 'add_to_debits' : 'add_to_credits';
         return $account->$what({
             $billId ? (
                 billId => $billId,
@@ -81,14 +45,16 @@ sub _single_charge {
             $db->make_transfers( $record->ID => $t );
         }
     }
+
     elsif ( $billId =~ s{ @(\w+) }{ %s }xms ) {
         $accounts = $accounts->search({ type => $1 });
         while ( my $account = $accounts->next ) {
-            $charger->( $account, sprintf $billId, $account->ID );
+            $charger->( $account, sprintf $billId );
         }
     }
+
     else {
-        die "Sorry, you haven't specified account(s) to charge";
+        croak "You haven't specified an account to charge";
     }
 
 }
@@ -168,48 +134,46 @@ sub _require_target {
 }
 
 sub charge_account {
-    goto &_single_charge if $OPTS{1};
+    goto &single_charge if $OPTS{1};
 
     print "Enter records ...\n";
 
+    local *ARGV = openhandle($_[0])
+        // croak "charge_account() expects open file handle to read from"
+        if exists $_[0];
+
     # Possible line formats:
     # -------------------------------------------------------
-    # Date Account Var Purpose            :: Target credit (TCr)
-    # Date Account +Amount Purpose        :: Payment Credit
-    # Date Account -Amount TCr ID Purpose :: Bill
-    # Date Account <Amount ID Purpose     :: Outgoing payment
+    # Date Account Var Amount Purpose     :: Credit (Payment or target)
+    #              ^^^ Field may be empty, yet not stripped
+    # Date Account Amount TCr ID: Purpose :: Bill
+    #                     ^^^ Field may be empty, yet not stripped
     # Please note: Omit Account if specified on commandline.
 
     my @transfers;
 
     while ( defined( my $line = <ARGV> ) ) {
-        chomp $line;
         _strip_comment_from($line) // next;
-        my ($date, $account, $amount, $purpose) = $ACCOUNT
-            ? do { my @columns = split /[,\s]\s*/, $line, 3;
+        my ($date, $account, $debit, $credit, $purpose) = $ACCOUNT
+            ? do { my @columns = split /[,\s]\s*/, $line, 4;
                    splice @columns, 1, 0, $ACCOUNT;
-                   @columns }
-            : split /[,\s]\s*/, $line, 4
+                   @columns
+                 }
+            : split /[,\s]\s*/, $line, 5
             ;
 
         $account = $db->resultset("Account")->find($account)
             // die "User not found: $account\n";
 
-        if ( $amount =~ m{^[a-z]}i ) {
-            _append_adj_lines_to($purpose);
-            my $r = record_credit($date, $account, $purpose, 0);
-            $targets{ $amount } = $r->credId;
-        }
-        elsif ( $amount =~ s/^([<-])// ) {
+        _append_adj_lines_to($purpose);
 
-            (my ($tgt, $billId), $purpose)
-                = $1 eq q{<} ? (undef, split /\s+/, $purpose, 2)
-                             : (split /\s+/, $purpose, 3)
-                             ;
+        if ( $debit =~ /^\d/ ) {
 
-            _append_adj_lines_to($purpose);
-
-            $DB::single=1;
+            my $tgt = $credit;
+            my $billId = $purpose =~ s{ \A ([[:print:]]+?) : \s* }{}xms
+                       ? $1
+                       : croak qq{Missing ID in debit purpose: $purpose}
+                       ;
 
             if ( $purpose =~ s{ \s* << \s* (.+?) \r? \n? \z }{}xms ) {
                 push @transfers, [
@@ -217,45 +181,59 @@ sub charge_account {
                 ] => $billId;
             }
                 
-            if ( my ($var, $account) = $tgt =~ m{^([A-Za-z]\w+)([?=]\w+)$} ) {
-                my $op = substr $account, 0, 1;
+            if ( my ($var, $op, $assigned)
+                     = $tgt =~ m{^([A-Za-z]\w+)([?=])(\d+)$}
+               ) {
                 if ( $op eq q{=} ) {
-                    $tgt = $targets{ $var } = $account;
+                    $tgt = $targets{ $var } = $assigned;
                 }
                 else {
-                    print "Please select target credit to reference by $var:\n",
-                          "-------------------------------------------------\n";
-                    $tgt = $targets{ $var }
-                         = select_target_credit_from($account);
+                    $tgt = select_target_credit_from($assigned, $var);
                 }
             }
             elsif ( $tgt =~ /^[a-z]/i ) {
                 $tgt = $targets{ $tgt }
-                    // croak "Target credit not declared: $tgt!\n";
+                    // croak "Target credit not assigned: $tgt!\n";
             }
-            record_debit(
-                $date, $account, $billId, $purpose,
-                integer_money_value($amount), $tgt
-            );    
-            
+
+            $account->add_to_debits({
+                billId => $billId,
+                date => $date,
+                purpose => $purpose,
+                value => integer_money_value($debit),
+                targetCredit => $tgt,
+            });
+
         }
-        elsif ( ($amount) = $amount =~ m{ \A \+? (\d+) \z }xms ) {
-            my $tgt = $purpose =~ s{ \s* >> \s* (.+) \z }{}xms && $1;
-            _append_adj_lines_to($purpose);
-            my $c = record_credit(
-                $date, $account, $purpose, integer_money_value($amount)
-            );
+
+        elsif ( $credit =~ /^\d/ ) {
+
+            my $tgt = $purpose =~ s{ \s* >> \s* (.+) \r? \n? \z }{}xms && $1;
+
+            my $c = $account->add_to_credits({
+                date => $date,
+                account => $account,
+                purpose => $purpose,
+                value => integer_money_value($credit)
+            });
+
+            if ( $debit =~ /^[a-z]/i ) { $targets{ $debit } = $c->credId; }
+            elsif ( $debit ne q{+} ) {
+                croak "Invalid field input: $debit neither number nor name";
+            }
+
             push @transfers, $c->credId => $tgt if $tgt;
+
         }
         else {
-            die "Amount cannot be parsed: $amount\n";
+            die "Cannot be parsed: $debit $credit\n";
         }
     }
 
     if ( @transfers ) {
         my $t = $db->make_transfers( @transfers );
         if ( $t ) {
-            printf "Transferred %f in total.\n", $t;
+            printf "Transferred %d in total.\n", $t;
         }
         else {
             print "No transfers could be made.\n";
@@ -281,9 +259,11 @@ sub integer_money_value {
 
 sub _append_adj_lines_to {
     my ($has_more, $line);
+    $DB::single=1;
     for ( $_[0] //= do { $has_more = 1; <ARGV> } ) {
-        if ( s/^"// .. s/(?<!")(")(?!")// || $has_more) {
-            $line = <ARGV> if $has_more = !$1;
+        if ( s/^"// .. s/(?<!")(")(?=\s|$)// || $has_more) {
+            last if $1;
+            $line = <ARGV>;
             last if $line eq $/;
             $line =~ s{^\s+}{};
             $_ .= $line;
@@ -293,33 +273,14 @@ sub _append_adj_lines_to {
     &_strip_comment_from;
 }
 
-sub record_credit {
-    my ($date, $account, $purpose, $amount) = @_;
-    return $account->credits->create({
-        date => $date,
-        account => $account,
-        purpose => $purpose,
-        value => $amount
-    });
-}
-
-sub record_debit {
-    my ($date, $debtor, $billId, $purpose, $value, $targetCredit) = @_;
-    return $db->resultset("Debit")->create({
-        billId => $billId,
-        date => $date,
-        debtor => $debtor->ID,
-        purpose => $purpose,
-        value => $value,
-        targetCredit => $targetCredit,
-    });
-}
-
 sub select_target_credit_from {
-    my ($account) = @_;
+    my ($account, $var) = @_;
 
     croak "Interactive target credit selection is not possible"
         if !( -t STDIN );
+
+    print "Please select target credit to reference by $var:\n",
+          "-------------------------------------------------\n";
 
     $account = $db->resultset("Account")->find($account);
     my $credits = $account->credits->search({}, {
@@ -339,11 +300,9 @@ sub select_target_credit_from {
     while (1) {
         print "Which credit do you want to target? ";
         chomp( my $input = <STDIN> );
-        return $input if $credits->find($input);
+        return $targets{ $var } = $input if $credits->find($input);
         warn "Credit ID $input is not a listed option.\n";
     }
-
-    return;
 
 }
 
@@ -351,7 +310,7 @@ sub make_transfers {
     print "Make transfers ...\n";
 
     if ( ! -t STDIN ) {
-        die "Input expected from interactive terminal";
+        croak "Input expected from interactive terminal";
     }
 
     my $search_opts = { order_by => { -asc => ['date'] } };
@@ -466,7 +425,60 @@ sub _balance_report {
     }    
 }
 
+} # End of package Commands
+
+return 1 if caller;
+
 package main;
+
+use Getopt::Long;
+
+%OPTS = (
+    'account' => \$ACCOUNT,
+    'target-credit' => \%targets
+);
+GetOptions( \%OPTS,
+  '1', 'account|a=s', 'target|t=s', 'target-credit|tcr=i', 'source|s=s',
+  'date|d=s', 'value|v=i', 'purpose|p=s', 'bill-id|b=s'
+);
+
+my %dispatcher = (
+    charge => \&Commands::charge_account,
+    ct  => sub {
+        Commands::charge_account();
+        Commands::make_transfers();
+    },
+    cts => sub {
+        Commands::charge_account();
+        Commands::make_transfers();
+        Commands::balance_status();
+    },
+    ctr => sub {
+        Commands::charge_account();
+        Commands::make_transfers();
+        Commands::balance_status(1);
+    },
+    report => sub {
+        Commands::balance_status(1);
+    },
+    server => sub {
+        exec qw{morbo server -w TrsrDB -w templates/};
+    },
+    sql => sub {
+        exec "sqlite3" => -cmd => "PRAGMA foreign_keys=ON; PRAGMA recursive_triggers=ON;"
+                       => -line => $ENV{TRSRDB_SQLITE_FILE};
+    },
+    status => \&Commands::balance_status,
+    transfer => \&Commands::make_transfers,
+    tr  => sub {
+        Commands::make_transfers();
+        Commands::balance_status(1);
+    },
+    ts  => sub {
+        Commands::make_transfers();
+        Commands::balance_status();
+    }
+);
 
 my $cmd = shift;
 if ( my $sref = $dispatcher{ $cmd } ) {
