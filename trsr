@@ -155,16 +155,18 @@ sub charge_account {
     while ( defined( my $line = <ARGV> ) ) {
         _strip_comment_from($line) // next;
         my ($date, $account, $debit, $credit, $purpose) = $ACCOUNT
-            ? do { my @columns = split /[,\s]\s*/, $line, 4;
+            ? do { my @columns = split /[, \t][ ]*/, $line, 4;
                    splice @columns, 1, 0, $ACCOUNT;
                    @columns
                  }
-            : split /[,\s]\s*/, $line, 5
+            : split /[, \t][ ]*/, $line, 5
             ;
 
         $account = $db->resultset("Account")->find($account)
             // die "User not found: $account\n";
 
+        chomp $credit if !defined $purpose;
+            
         _append_adj_lines_to($purpose);
 
         if ( $debit =~ /^\d/ ) {
@@ -218,7 +220,7 @@ sub charge_account {
             });
 
             if ( $debit =~ /^[a-z]/i ) { $targets{ $debit } = $c->credId; }
-            elsif ( $debit ne q{+} ) {
+            elsif ( length $debit && $debit ne q{+} ) {
                 croak "Invalid field input: $debit neither number nor name";
             }
 
@@ -259,9 +261,8 @@ sub integer_money_value {
 
 sub _append_adj_lines_to {
     my ($has_more, $line);
-    $DB::single=1;
     for ( $_[0] //= do { $has_more = 1; <ARGV> } ) {
-        if ( s/^"// .. s/(?<!")(")(?=\s|$)// || $has_more) {
+        if ( (s/^"// .. s/(?<!")(")(?=\s|$)//) || $has_more) {
             last if $1;
             $line = <ARGV>;
             last if $line eq $/;
