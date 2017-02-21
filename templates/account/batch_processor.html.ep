@@ -1,0 +1,57 @@
+% title "Batch processor";
+
+<form method="POST">
+
+<h2>Incomings, outgoings, transfers</h2>
+
+<textarea name="batch" placeholder="See help link below for a syntax description"><%=
+param 'batch'
+%></textarea>
+
+% my %txn_selected = ( (param("txn-mode") // "all") => q{checked="checked"} );
+<h2>Transaction mode:</h2>
+<label><input type="radio" name="txn-mode" value="all" <%= $txn_selected{all} %> />
+  submission: keep all entries or none if there is an error</label><br>
+<label><input type="radio" name="txn-mode" value="each" <%= $txn_selected{each} %> />
+  each entry: keep entries before any erroneous one</label>
+</p>
+
+<button type="submit">Submit</button>
+
+</form>
+
+% stash help => $_ for begin
+<h3>What is the basic syntax?</h3>
+
+<p>You can separate the fields of each line by a comma and optional whitespace, or at least one whitespace. The order of columns is:</p>
+
+<ol>
+<li>The booking date in format YYYY-MM-DD,</li>
+<li>The account name,</li>
+<li>The value if it is a debit,</li>
+<li>The value if it is a credit,</li>
+<li>The purpose (in the case of a debit, it must start with bill ID and colon),</li>
+<li>Optional: "<< Comma-separated list of credit IDs used to pay the debt" or ">> Comma-separated list of bill IDs the booked income is used for", respectively</li>
+</ol>
+
+<h4>Multi-line purposes</h4>
+
+<p>Multi-line purposes must either be surrounded by " (escape literal " by doubling it), or started in the next line and terminated with an empty one.</p>
+ 
+<h3>How to book an incoming payment</h3>
+
+<p>In the credit column must be a value greater than 0. Cent must be passed as a decimal part, i.e. "100" really mean 100.00, not 1.00! In the debit column you MAY input a name starting with a letter (otherwise it needs to be just "+"), by which you can refer to a credit in lines below instead of the number.</p>
+
+<h3>How to enter a target credit</h3>
+
+<p>A target credit is defined as initially equal 0.</p>
+
+<h3>How to make an internal debt</h3>
+
+<p>A debit, recognized by an amount in the debit column, can have a target credit name or number in the credit column.</p>
+
+<h3>How to book an outgoing payment</h3>
+
+<p>An outgoing payment must not have a target credit. Leave that field empty.</p>
+
+% end

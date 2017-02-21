@@ -90,10 +90,11 @@ sub batch_processor {
                  ;
         open my $fh, '<', \$text;
         require "$Bin/trsr" or die;
-        $self->app->db->storage->txn_do(sub {
-            Commands::act_on_other_db($self->app->db);
-            Commands::charge_account($fh);
-        });
+        Commands->import(
+            $self->app->db,
+            $self->param("txn-mode") // "all"
+        );
+        Commands::charge_account($fh);
         $self->redirect_to('home');
     }
 
