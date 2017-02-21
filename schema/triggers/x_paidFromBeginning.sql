@@ -1,4 +1,4 @@
-CREATE TRIGGER enforceZeroPaidAtStart
+CREATE TRIGGER x_paidFromBeginning
     BEFORE INSERT ON Debit
 BEGIN
     SELECT RAISE(FAIL, "Debt must be initially unpaid")

@@ -1,4 +1,4 @@
-CREATE TRIGGER enforceFixedDebit
+CREATE TRIGGER x_changedDebit
     BEFORE UPDATE OF debtor, transferCredit, value ON Debit
     WHEN EXISTS (SELECT * FROM Transfer WHERE billId=NEW.billId)
      AND NOT EXISTS (SELECT * FROM __INTERNAL_TRIGGER_STACK LIMIT 1)

@@ -1,4 +1,4 @@
-CREATE TRIGGER enforceFixedCredit
+CREATE TRIGGER x_changedCredit
     BEFORE UPDATE OF account, value ON Credit
     WHEN EXISTS (SELECT * FROM Transfer WHERE credId=NEW.credId)
      AND NOT EXISTS (SELECT * FROM __INTERNAL_TRIGGER_STACK)
