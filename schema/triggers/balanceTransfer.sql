@@ -2,12 +2,12 @@ CREATE TRIGGER linkTransferTightly
     AFTER INSERT ON Transfer 
 BEGIN
 
-  SELECT RAISE(FAIL, "It is not the debtor who is set to pay")
+  SELECT RAISE(ABORT, "It is not the debtor who is set to pay")
     WHERE (SELECT debtor FROM Debit WHERE billId=NEW.billId)
        != (SELECT account FROM Credit WHERE credId=NEW.credId)
     ;
 
-  SELECT RAISE(FAIL, "Target of a debit cannot be an incoming payment")
+  SELECT RAISE(ABORT, "Target of a debit cannot be an incoming payment")
   FROM Credit c
     JOIN Debit d ON c.credId = d.targetCredit
   WHERE c.credId = NEW.credId
@@ -18,8 +18,8 @@ BEGIN
 
   INSERT INTO __INTERNAL_TRIGGER_STACK
       SELECT NEW.ROWID,
-          CASE remainingDebt   WHEN 0 THEN RAISE(FAIL, "Debt settled") ELSE NEW.billId END,
-          CASE remainingCredit WHEN 0 THEN RAISE(FAIL, "Credit spent") ELSE NEW.credId END,
+          CASE remainingDebt   WHEN 0 THEN RAISE(ABORT, "Debt settled") ELSE NEW.billId END,
+          CASE remainingCredit WHEN 0 THEN RAISE(ABORT, "Credit spent") ELSE NEW.credId END,
           min(remainingDebt, remainingCredit) 
       FROM (SELECT
           (SELECT value - paid FROM Debit WHERE billId=NEW.billId) AS remainingDebt, 

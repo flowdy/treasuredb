@@ -3,6 +3,6 @@ CREATE TRIGGER x_changedCredit
     WHEN EXISTS (SELECT * FROM Transfer WHERE credId=NEW.credId)
      AND NOT EXISTS (SELECT * FROM __INTERNAL_TRIGGER_STACK)
 BEGIN
-    SELECT RAISE(FAIL, "Credit involved in transactions to revoke at first");
+    SELECT RAISE(ABORT, "Credit involved in transactions to revoke at first");
 END;
 

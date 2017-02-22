@@ -4,6 +4,6 @@ CREATE TRIGGER x_spentChangedOutsideTrigger
     BEFORE UPDATE OF spent ON Credit
     WHEN NOT EXISTS (SELECT * FROM __INTERNAL_TRIGGER_STACK)
 BEGIN
-    SELECT RAISE(FAIL, "spent is set and adjusted automatically according to added Transfer records");
+    SELECT RAISE(ABORT, "spent is set and adjusted automatically according to added Transfer records");
 END;
 
