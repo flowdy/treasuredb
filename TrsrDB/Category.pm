@@ -3,7 +3,7 @@ use strict;
 package TrsrDB::Category;
 use base qw/DBIx::Class::Core/;
 
-__PACKAGE__->table('category');
+__PACKAGE__->table('Category');
 __PACKAGE__->add_columns(qw/ID label/);
 __PACKAGE__->set_primary_key('ID');
 

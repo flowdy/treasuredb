@@ -1,5 +1,6 @@
 #!/usr/bin/env perl
 use strict;
+use utf8;
 
 my ($db, %OPTS, $ACCOUNT, %targets);
 
@@ -52,7 +53,7 @@ sub single_charge { # charge interactively
         my $what = $billId ? 'add_to_debits' : 'add_to_credits';
         return $account->$what({
             $billId ? (
-                billId => $billId,
+                billId => sprintf($billId, $account->ID),
                 targetCredit => delete( $OPTS{target} ),
             ) : (),
             map { $_ => $OPTS{$_} } qw(value purpose date),
@@ -61,19 +62,27 @@ sub single_charge { # charge interactively
 
     if ( $ACCOUNT ) {
         my $account = $accounts->find({ ID => $ACCOUNT });
+        my ($record, $transf_count);
         cond_txn_each { 
-            my $record = $charger->($account, $billId);
+            $record = $charger->($account, $billId);
             if ( !$billId and my $t = $OPTS{target} ) {
-                $db->make_transfers( $record->ID => $t );
+                $transf_count = $db->make_transfers( $record->ID => $t );
             }
         };
+        printf("Created %s, transferred %d of %d.\n",
+            $billId // $record->credId, $transf_count, $record->value
+        );
     }
 
-    elsif ( $billId =~ s{ @(\w+) }{ %s }xms ) {
-        $accounts = $accounts->search({ type => $1 });
+    elsif ( $billId =~ s{ @ (\{)? ((?(1)\S+|\w+)) (?(1)\}) }{ %s }xms ) {
+        # ^^ regex to consider list of real or pseudonymized account IDs
+        # e.g. @Member | @{one,another,...} | @{M{xyz},M{mno}} 
+        $accounts = $accounts->search({
+            $1 ? (ID => { -in => [ split /,/, $2 ] }) : ( type => $2 )
+        });
         cond_txn_all {
             while ( my $account = $accounts->next ) {
-                cond_txn_each { $charger->( $account, sprintf $billId ); }
+                cond_txn_each { $charger->( $account, $billId ); }
             }
         };
     }
@@ -86,7 +95,7 @@ sub single_charge { # charge interactively
 
 sub _require_value {
     until ( $OPTS{value} && $OPTS{value} =~ m{^\d+(\.\d\d)?$} ) {
-        print "Charge value (cent part omittable): ";
+        print "Charge value in cent (or use decimal point): ";
         chomp( $OPTS{value} = <STDIN> );
     }
     $_ = integer_money_value($_) for $OPTS{value};
@@ -153,7 +162,7 @@ sub _require_target {
             chomp( my $t = <STDIN> );
         }
         if ( $t =~ m{ \A \? (\w+) \z } ) {
-            $OPTS{target} = _select_target_credit_from($t);
+            $OPTS{target} = select_target_credit_from($t);
         }
     }
 }
@@ -163,13 +172,10 @@ sub charge_account {
 
     print "Enter records ...\n" if -t STDIN;
 
-    exists $_[0]
-        and local *ARGV = (
-            openhandle($_[0])
-            // croak "charge_account() expects open file handle to read from"
-        )
-        and my $abort_on_exception = 1
-        ;
+    local *ARGV = (
+        openhandle($_[0])
+        // croak "charge_account() expects open file handle to read from"
+    ) if my $abort_on_exception = exists $_[0];
 
     # Possible line formats:
     # -------------------------------------------------------
@@ -188,18 +194,36 @@ sub charge_account {
     
             _strip_comment_from($line) // next;
     
+            my ($sep) = $line =~ m{([,; \t|])};
+
             my @columns
-              = split /[, \t][ ]*/, $line,
+              = split /[$sep][ ]*/, $line,
                 defined($ACCOUNT) ? 4 : 5;
     
             splice @columns, 1, 0, $ACCOUNT // ();
-    
-            eval { cond_txn_each { _inner_charge(@columns) } } // do {
+
+            # Strip quotes from all but ultimate purpose
+            for ( @columns[ 0 .. 3 ] ) {
+                m{\A(["'])}xms && m{$1\z}xms or next;
+                substr $_,  0, 1, '';
+                substr $_, -1, 1, '';
+            }
+            my ($record, $transf_count)
+                = eval { cond_txn_each { _inner_charge(@columns) } };
+
+            if ( !defined $record ) {
                 if ( $@ ) {
                     die $@ if $abort_on_exception;
                     warn $@;
+                    next;
                 }
+                else { die '_inner_charge() returned nothing'; }
             };
+
+            printf("Created %s, transferred %d of %d.\n",
+                eval { $record->billId } // $record->credId,
+                $transf_count, $record->value
+            );
         }
 
     }
@@ -213,26 +237,69 @@ sub _inner_charge {
 
     chomp $credit if !defined $purpose;
         
-    { # Append any consecutive lines
-        my ($has_more, $line);
-        for ( $purpose //= do { $has_more = 1; <ARGV> } ) {
-            (s/^"// .. s/(?<!")(")(?=\s|$)//) || $has_more or last;
-            last if $1;
-            $line = <ARGV> or last;
-            last if $line eq $/;
-            $line =~ s{^\s+}{};
-            $_ .= $line;
-            redo;
+    { # In order to slurp any consecutive lines take two cases into account:
+      #   1) Purpose has not begun next from value on initial line ->
+      #      Grab every line before the next empty one (must have no length).
+      #      Consider any quotes to be literal.
+      #   2) Grab everything until closing quote is recognized.
+      #      This is the case when the quote is the same as the opening one,
+      #      it in not doubled and before a space or the end of line.
+
+        my ($quot, $end, $has_more, $line);
+
+        $DB::single = 1;
+
+        if ( defined $purpose ) {
+            $has_more = $purpose !~ s{ \A (?<quot> ["'] ) }{}xms
+                     && $purpose =~ m{ : \s* \z }xms;
         }
+        else {
+            $has_more = 1;
+            ($purpose = <ARGV>) =~ s{^\s+}{};
+        }
+
+        while (1) { # Single iteration, either early closed or redone
+
+            $has_more
+                or # we are inside region wrapped by identical quotes:
+                   ($quot = $+{quot}) .. ( $end = $purpose =~ s{
+                       \G             # from position of last iteration
+                       (?<![$quot\\]) # must not be preseded by escape or
+                       ($quot)        # same quote
+                       (?=\s|\z)      # before space or end of line
+                     }{}goxms
+                   )
+                or last # because there are no consecutive lines.
+                ;
+
+            last if (!$+{quot} && $end)        # we reach closing quote
+                 || !defined($line = <ARGV>)   # there is no next line
+                 || ($has_more && $line eq $/) # empty line             
+                 ;
+
+            $line =~ s{^\s+}{};
+            $line =~ s{$quot{2}}{$quot}g if $quot; # merge consecutive quotes
+            $purpose .= $line;
+
+        }
+
+        chomp $purpose;
         _strip_comment_from($purpose);
+
     }
 
-    my @transfer;
+    my ($record, @transfer, $category);
 
-    if ( $debit =~ /^\d/ ) {
+    if ( $purpose =~ s{ \s* -C\[ ([^\r\t\n\]]+) \] \z }{}xms ) {
+        $category = $db->resultset("Category")->search({
+            $1 =~ /^\d+$/ ? (ID => $1) : (label => { -like => "$1%" })
+        })->single->ID;
+    }
+
+    if ( $debit =~ /\b\d/ ) {
 
         my $tgt = $credit;
-        my $billId = $purpose =~ s{ \A ([[:print:]]+?) : \s* }{}xms
+        my $billId = $purpose =~ s{ \A ([[:graph:]]+?) : \s* }{}xms
                    ? $1
                    : croak qq{Missing ID in debit purpose: $purpose}
                    ;
@@ -244,7 +311,7 @@ sub _inner_charge {
         }
             
         if ( my ($var, $op, $assigned)
-                 = $tgt =~ m{^([A-Za-z]\w+)([?=])(\w+)$}
+                 = $tgt =~ m{ \A ([A-Za-z]\w+) ([?=]) (\w+) \z }xms
            ) {
 
             if ( defined( my $c = $targets{$var} ) ) {
@@ -263,18 +330,20 @@ sub _inner_charge {
             $tgt = $targets{ $tgt }
                 // croak "Target credit not assigned: $tgt!\n";
         }
+        else { $tgt = undef; }
 
-        $account->add_to_debits({
+        $record = $account->add_to_debits({
             billId => $billId,
             date => $date,
             purpose => $purpose,
             value => integer_money_value($debit),
             targetCredit => $tgt,
+            category => $category
         });
 
     }
 
-    elsif ( $credit =~ /^\d/ ) {
+    elsif ( $credit =~ /\b\d/ ) {
 
         my $tgt = $purpose =~ s{ \s* >> \s* (.+) \r? \n? \z }{}xms && $1;
 
@@ -282,7 +351,8 @@ sub _inner_charge {
             date => $date,
             account => $account,
             purpose => $purpose,
-            value => integer_money_value($credit)
+            value => integer_money_value($credit),
+            category => $category
         });
 
         if ( $debit =~ /^[a-z]/i ) { $targets{ $debit } = $c->credId; }
@@ -292,13 +362,14 @@ sub _inner_charge {
 
         push @transfer, $c->credId => $tgt if $tgt;
 
+        $record = $c;
     }
 
     else {
         croak "Cannot be parsed: $debit $credit\n";
     }
 
-    $db->make_transfers(@transfer) if @transfer;
+    return $record, @transfer ? $db->make_transfers(@transfer) : 0;
 
 }
 
@@ -310,11 +381,22 @@ sub _strip_comment_from {
 }
  
 sub integer_money_value {
+
     my $val = shift;
-    die "Not a positive money value (cent): $val" if $val =~ /[^\d.]/;
-    if ( $val =~ s{ ( \. (\d\d)? ) \z }{}xms ) {
-        ($val *= 100) += $2 // 0;
-    }
+
+    # Strip currency signs and space.
+    $val =~ s{ \A [^0-9]+ }{}xms;
+    $val =~ s{ [^0-9]+ \z }{}xms;
+
+    # Strip cent to finally add to the integer
+    my $cent = $val =~ s{ [,.] ([0-9]{2})? \z }{}xms ? $1 || 0 : undef;
+
+    # Strip number formatting separators
+    $val =~ s{ (?<=[0-9]) [ _.,'’] (?=[0-9]) }{}gxms;
+
+    die "Not a positive money value (cent): $val" if $val =~ /[^0-9]/;
+
+    ($val *= 100) += $cent if defined $cent;
     return $val;
 }
 
@@ -417,9 +499,10 @@ sub balance_status {
     while ( my $r = $results->next ) {
         my %val = $r->get_columns();
         if ($with_report) { _balance_report( $val{ID} ) }
-        print join "\t", $with_report ? "Balance:\n$header" : $val{ID}, @val{qw{
-            available earned spent promised arrears even_until
-        }};
+        print join "\t", $with_report ? "Balance:\n$header" : $val{ID},
+              map({ sprintf '%7d', $val{$_} } qw{
+                    available earned spent promised arrears
+                 }), $val{even_until};
         print "\n";
     }
 }
@@ -480,7 +563,22 @@ return 1 if caller;
 package main;
 
 use Getopt::Long;
-use TrsrDB \$db;
+use FindBin qw($Bin);
+use lib $Bin;
+BEGIN {
+    if (!( $ARGV[0] eq 'makedb'
+        || $ARGV[0] eq 'server'
+        || $ARGV[0] eq 'sql'
+       )) {
+        require TrsrDB;
+        TrsrDB->import(\$db);
+    }
+    elsif ( $ARGV[0] eq 'makedb' && -e $ENV{TRSRDB_SQLITE_FILE} ) {
+        die "$ENV{TRSRDB_SQLITE_FILE} does exist.\n";
+    }
+}
+
+Commands::set_txn_mode(undef, "each");
 
 %OPTS = (
     'account' => \$ACCOUNT,
@@ -491,7 +589,6 @@ GetOptions( \%OPTS,
   'txn-mode=s', 'account|a=s', 'target|t=s', 'target-credit|tcr=i', 'source|s=s',
   'date|d=s', 'value|v=i', 'purpose|p=s', 'bill-id|b=s'
 );
-$DB::single=1;
 delete @OPTS{'account', 'target-credit', 'txn-mode'};
 
 my %dispatcher = (
@@ -509,6 +606,11 @@ my %dispatcher = (
         Commands::charge_account();
         Commands::make_transfers();
         Commands::balance_status(1);
+    },
+    makedb => sub {
+        chdir($Bin);
+        exec q[cat schema/tables.sql schema/*/*.sql]
+           . q[| sqlite3 $TRSRDB_SQLITE_FILE];
     },
     report => sub {
         Commands::balance_status(1);
